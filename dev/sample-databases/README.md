@@ -20,19 +20,76 @@ docker compose --profile mssql-arm up -d    # Azure SQL Edge, arm64 hosts
 
 ## Connection details
 
-| Engine | Host / file | Port | Database | User | Password |
+Every value below was verified against the running containers. All five carry the same sample
+schema — 7 tables and a view, plus a `settings` table only SQLite has.
+
+### In the app
+
+Pick the engine, fill these in, press **Connect**, then **Save** with a profile name so it comes
+back next launch. The password is never saved; you retype that one field.
+
+| | PostgreSQL | MySQL | MariaDB | SQL Server | SQLite |
 | --- | --- | --- | --- | --- | --- |
-| PostgreSQL | `localhost` | 5432 | `ccrsample` | `ccr` | `ccr_dev_password` |
-| MySQL | `localhost` | 3306 | `ccrsample` | `ccr` | `ccr_dev_password` |
-| MariaDB | `localhost` | 3307 | `ccrsample` | `ccr` | `ccr_dev_password` |
-| SQL Server | `localhost` | 1433 | `ccrsample` | `sa` | `ccr_Dev_Password1` |
-| SQL Server (arm64, Edge) | `localhost` | 1433 | `ccrsample` | `sa` | `ccr_Dev_Password1` |
-| SQLite | `./ccrsample.db` | — | — | — | — |
+| Engine | PostgreSQL | MySQL / MariaDB | MySQL / MariaDB | Microsoft SQL Server | SQLite |
+| Server | `localhost` | `localhost` | `localhost` | `localhost` | — |
+| Port | `5432` | `3306` | `3307` | `1433` | — |
+| Database | `ccrsample` | `ccrsample` | `ccrsample` | `ccrsample` | `./ccrsample.db` |
+| Integrated security | **untick** | n/a | n/a | **untick** | n/a |
+| user | `ccr` | `ccr` | `ccr` | `sa` | — |
+| password | `ccr_dev_password` | `ccr_dev_password` | `ccr_dev_password` | `ccr_Dev_Password1` | — |
+| Trust cert | either | either | either | **tick** | n/a |
 
-These are throwaway development credentials for a local container. Do not reuse them.
+Two things catch people out:
 
-In CCReimagined: pick the engine, fill the fields, **Connect**, then save it as a profile so
-it comes back next launch. Passwords are never written to the profile, so you retype them.
+- **Untick "Integrated security" for PostgreSQL.** Postgres advertises integrated auth because
+  peer/ident over a Unix socket is its equivalent, so the box starts ticked — and while it is,
+  the user and password fields stay disabled and no password reaches the connection string. The
+  failure looks like a server problem rather than a missing password. MySQL and MariaDB do not
+  offer it, so the fields are always live there.
+- **SQL Server's password is different**, and deliberately so: `ccr_Dev_Password1` satisfies the
+  complexity rules the engine enforces at startup. Note the capital D and the trailing digit.
+
+### As raw connection strings
+
+Tick **Raw connection string** and paste one of these, or use them from any other client. These
+are exactly what the providers compose from the fields above.
+
+```
+PostgreSQL   Host=localhost;Port=5432;Database=ccrsample;Username=ccr;Password=ccr_dev_password;SSL Mode=Prefer
+
+MySQL        Server=localhost;Port=3306;User ID=ccr;Password=ccr_dev_password;Database=ccrsample;SSL Mode=Preferred
+
+MariaDB      Server=localhost;Port=3307;User ID=ccr;Password=ccr_dev_password;Database=ccrsample;SSL Mode=Preferred
+
+SQL Server   Server=localhost,1433;Initial Catalog=ccrsample;User ID=sa;Password=ccr_Dev_Password1;TrustServerCertificate=True;Encrypt=False
+
+SQLite       Data Source=/absolute/path/to/ccrsample.db;Mode=ReadWrite
+```
+
+A saved profile keeps a raw connection string too, with every password-bearing keyword stripped
+out first — so the stored copy is missing its password and needs it retyped, by design.
+
+### From a shell
+
+```bash
+docker exec -it ccr-postgres psql -U ccr -d ccrsample
+docker exec -it ccr-mysql    mysql   -uccr -pccr_dev_password ccrsample
+docker exec -it ccr-mariadb  mariadb -uccr -pccr_dev_password ccrsample
+sqlite3 ./ccrsample.db
+```
+
+Azure SQL Edge ships no client tools, so there is no `docker exec` equivalent for SQL Server —
+use the app, or any client pointed at `localhost:1433`.
+
+### For the live tests
+
+The test suite finds these on its own and skips when one is not up. Override any of them:
+
+```bash
+CCR_TEST_POSTGRES=...  CCR_TEST_MYSQL=...  CCR_TEST_MARIADB=...  CCR_TEST_SQLSERVER=...
+```
+
+These are throwaway development credentials for local containers. Do not reuse them anywhere.
 
 ## The ARM caveat, and why SQL Server is behind a profile
 
@@ -73,6 +130,17 @@ not as a model of production. If you need certainty about real SQL Server behavi
 amd64 service on an amd64 host.
 
 Both services bind port 1433, so run one profile or the other, never both.
+
+Either way the sample schema has to be applied by hand, because SQL Server has no
+`docker-entrypoint-initdb.d` convention:
+
+```bash
+./seed-sqlserver.sh
+```
+
+That script needs no `sqlcmd` — it uses the same .NET client the generated code does, which is
+what makes it work on arm64, where the `mssql-tools` image does not exist and Edge ships no
+client tools of its own.
 
 ## What the schema is for
 
