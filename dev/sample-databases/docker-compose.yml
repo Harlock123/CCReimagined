@@ -124,8 +124,41 @@ services:
     profiles:
       - mssql
 
+  # ---------------------------------------------------------------- arm64 fallback
+  #
+  # The service above is the real SQL Server, and it is amd64 only. Under qemu-user on an
+  # arm64 host sqlservr segfaults on startup (exit 139) — Docker Desktop on Apple silicon
+  # gets away with it because Rosetta 2 is a far more complete x86 translator than qemu.
+  #
+  # Azure SQL Edge is the same T-SQL engine family with a native arm64 build, so the catalog
+  # queries and generated code can still be exercised here. It is retired, frozen, and a
+  # reduced engine — fine as a test target, not something to model production on.
+  #
+  #   docker compose --profile mssql-arm up -d
+  #
+  sqlserver-arm:
+    image: mcr.microsoft.com/azure-sql-edge:latest
+    container_name: ccr-sqlserver-arm
+    environment:
+      ACCEPT_EULA: "1"
+      MSSQL_SA_PASSWORD: "ccr_Dev_Password1"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-arm-data:/var/opt/mssql
+    healthcheck:
+      # Edge ships no sqlcmd, so the check is that the port is accepting connections.
+      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/localhost/1433' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    profiles:
+      - mssql-arm
+
 volumes:
   postgres-data:
   mysql-data:
   mariadb-data:
   sqlserver-data:
+  sqlserver-arm-data:

@@ -149,7 +149,7 @@ Each engine emits a different class — a different ADO.NET client, a different 
 above all a different way of handing back a generated key (PostgreSQL returns it from the INSERT,
 MySQL fetches it with `LAST_INSERT_ID`). `LiveCrudTests` compiles the generated class and runs
 insert, key read-back, read, update, exists, list getters and delete against a real server, for
-PostgreSQL, MySQL and MariaDB.
+PostgreSQL, MySQL, MariaDB and SQL Server.
 
 They need the sample servers from `dev/sample-databases`. When a server is not reachable the
 tests **skip** rather than fail, so a bare checkout with nothing running still goes green:
@@ -162,5 +162,9 @@ dotnet test
 Point them elsewhere with a full connection string per engine:
 
 ```
-CCR_TEST_POSTGRES=... CCR_TEST_MYSQL=... CCR_TEST_MARIADB=... dotnet test
+CCR_TEST_POSTGRES=... CCR_TEST_MYSQL=... CCR_TEST_MARIADB=... CCR_TEST_SQLSERVER=... dotnet test
 ```
+
+The SQL Server target creates its test database if it is missing, so it needs a reachable server
+and nothing else. On arm64 that means the `mssql-arm` profile — see
+`dev/sample-databases/README.md` for why the real amd64 image will not run there.

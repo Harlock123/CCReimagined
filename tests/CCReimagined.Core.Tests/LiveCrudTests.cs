@@ -2,6 +2,7 @@ using System.Data.Common;
 using System.Reflection;
 using CCReimagined.Core.Codegen;
 using CCReimagined.Core.Model;
+using Microsoft.Data.SqlClient;
 using MySqlConnector;
 using Npgsql;
 
@@ -19,7 +20,8 @@ namespace CCReimagined.Core.Tests;
 [Collection("live-servers")]
 public sealed class LiveCrudTests
 {
-    private static readonly Type[] ProviderTypes = [typeof(NpgsqlConnection), typeof(MySqlConnection)];
+    private static readonly Type[] ProviderTypes =
+        [typeof(NpgsqlConnection), typeof(MySqlConnection), typeof(SqlConnection)];
 
     [SkippableTheory]
     [MemberData(nameof(LiveServers.All), MemberType = typeof(LiveServers))]
@@ -186,6 +188,7 @@ public sealed class LiveCrudTests
         {
             "postgresql" => new NpgsqlConnection(connectionString),
             "mysql" => new MySqlConnection(connectionString),
+            "sqlserver" => new SqlConnection(connectionString),
             _ => throw new NotSupportedException($"No live harness for provider '{provider.Id}'."),
         };
 

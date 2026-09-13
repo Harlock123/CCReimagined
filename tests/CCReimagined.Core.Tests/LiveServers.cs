@@ -15,6 +15,13 @@ public sealed record LiveTarget(
     Func<string, string> CreateTableSql,
     ConnectionSettings Defaults)
 {
+    /// <summary>
+    /// Optional setup run once the server answers, returning the connection string the tests
+    /// should actually use. SQL Server needs it: the engine has no init-script convention, so
+    /// the test database may not exist yet.
+    /// </summary>
+    public Func<string, Task<string>>? Prepare { get; init; }
+
     public IDatabaseProvider Provider => ProviderRegistry.ById(ProviderId);
 
     public override string ToString() => Label;
@@ -92,11 +99,65 @@ public static class LiveServers
         Defaults = MySql.Defaults with { Port = 3307 },
     };
 
+    public static LiveTarget SqlServer { get; } = new(
+        "SQL Server",
+        "sqlserver",
+        "CCR_TEST_SQLSERVER",
+        table => $"""
+            CREATE TABLE {table} (
+                id        int IDENTITY(1,1) PRIMARY KEY,
+                name      nvarchar(40) NOT NULL,
+                nickname  nvarchar(40) NULL,
+                balance   decimal(12,2) NOT NULL,
+                is_active bit NOT NULL,
+                joined    date NULL,
+                payload   varbinary(max) NULL
+            )
+            """,
+        new ConnectionSettings
+        {
+            Host = "localhost",
+            Port = 1433,
+            // Connect to master first; Prepare creates the test database and repoints here.
+            Database = "master",
+            AuthMode = AuthMode.UserPassword,
+            UserName = "sa",
+            Password = "ccr_Dev_Password1",
+            TrustServerCertificate = true,
+            ConnectTimeoutSeconds = 5,
+        })
+    {
+        Prepare = EnsureSqlServerDatabaseAsync,
+    };
+
+    private const string SqlServerTestDatabase = "ccrsample";
+
+    /// <summary>
+    /// Creates the test database when it is missing, so the live tests stand on their own
+    /// rather than depending on the sample seed having been applied.
+    /// </summary>
+    private static async Task<string> EnsureSqlServerDatabaseAsync(string masterConnectionString)
+    {
+        var provider = ProviderRegistry.ById("sqlserver");
+
+        await using (var connection = new Microsoft.Data.SqlClient.SqlConnection(masterConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                $"IF DB_ID('{SqlServerTestDatabase}') IS NULL CREATE DATABASE [{SqlServerTestDatabase}];";
+            await command.ExecuteNonQueryAsync();
+        }
+
+        return provider.WithDatabase(masterConnectionString, SqlServerTestDatabase);
+    }
+
     public static IEnumerable<object[]> All()
     {
         yield return [PostgreSql];
         yield return [MySql];
         yield return [MariaDb];
+        yield return [SqlServer];
     }
 
     /// <summary>
@@ -120,7 +181,14 @@ public static class LiveServers
                 : overridden;
 
             var probe = await target.Provider.TestConnectionAsync(connectionString);
-            var result = probe.Success ? connectionString : null;
+            string? result = null;
+
+            if (probe.Success)
+            {
+                result = target.Prepare is null
+                    ? connectionString
+                    : await target.Prepare(connectionString);
+            }
 
             Probed[target.Label] = result;
             return result;
@@ -132,6 +200,6 @@ public static class LiveServers
     }
 
     public static string SkipReason(LiveTarget target) =>
-        $"{target.Label} is not reachable. Start it with " +
-        $"`docker compose up -d` in dev/sample-databases, or set {target.EnvironmentVariable}.";
+        $"{target.Label} is not reachable. Start it from dev/sample-databases " +
+        $"(`docker compose up -d`, plus a --profile for SQL Server), or set {target.EnvironmentVariable}.";
 }

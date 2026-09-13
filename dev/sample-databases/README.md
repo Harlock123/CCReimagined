@@ -13,8 +13,9 @@ docker compose up -d
 # SQLite — no server at all, just a file
 ./make-sqlite.sh
 
-# SQL Server — emulated, see the caveat below
-docker compose --profile mssql up -d
+# SQL Server — pick one of these, see the caveat below
+docker compose --profile mssql up -d        # real SQL Server, amd64 hosts
+docker compose --profile mssql-arm up -d    # Azure SQL Edge, arm64 hosts
 ```
 
 ## Connection details
@@ -25,6 +26,7 @@ docker compose --profile mssql up -d
 | MySQL | `localhost` | 3306 | `ccrsample` | `ccr` | `ccr_dev_password` |
 | MariaDB | `localhost` | 3307 | `ccrsample` | `ccr` | `ccr_dev_password` |
 | SQL Server | `localhost` | 1433 | `ccrsample` | `sa` | `ccr_Dev_Password1` |
+| SQL Server (arm64, Edge) | `localhost` | 1433 | `ccrsample` | `sa` | `ccr_Dev_Password1` |
 | SQLite | `./ccrsample.db` | — | — | — | — |
 
 These are throwaway development credentials for a local container. Do not reuse them.
@@ -53,9 +55,24 @@ Emulation needs the qemu binfmt handlers registered once per boot:
 docker run --privileged --rm tonistiigi/binfmt --install amd64
 ```
 
-Expect the SQL Server container to take a minute or two to come up, and the seed step to be
-unhurried. Once it is running, the metadata queries this tool makes are small, so browsing
-feels fine.
+**On this machine that is not enough.** With the handlers installed, `sqlservr` still segfaults
+immediately (exit 139) under qemu-user. Docker Desktop on Apple silicon gets away with running
+the same image because Rosetta 2 is a far more complete x86 translator than qemu-user is. So on
+arm64 Linux the amd64 image is, in practice, a non-starter.
+
+The workable arm64 target is **Azure SQL Edge**, which has a native arm64 build:
+
+```bash
+docker compose --profile mssql-arm up -d
+```
+
+It is the same T-SQL engine family — it reports as SQL Server 15.0, the `sys.*` catalog views
+this tool queries all behave, and the generated `Microsoft.Data.SqlClient` code round-trips
+against it. It is also retired, frozen and a reduced engine, so treat it as a test target and
+not as a model of production. If you need certainty about real SQL Server behaviour, run the
+amd64 service on an amd64 host.
+
+Both services bind port 1433, so run one profile or the other, never both.
 
 ## What the schema is for
 
