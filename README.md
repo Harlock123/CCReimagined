@@ -1,5 +1,7 @@
 # CCReimagined
 
+[![build](https://github.com/Harlock123/CCReimagined/actions/workflows/build.yml/badge.svg)](https://github.com/Harlock123/CCReimagined/actions/workflows/build.yml)
+
 A cross-platform rebuild of [CodeComplete](https://github.com/Harlock123/codecomplete) — the
 WinForms tool that pointed at a SQL Server table and wrote a full data-abstraction class for it.
 
@@ -106,6 +108,29 @@ dotnet test
 ```
 
 Requires the .NET 10 SDK.
+
+### Builds
+
+Every push to `main` runs the suite and cross-publishes all six targets; a `v*` tag does the
+same and attaches them to a GitHub release.
+
+```
+./build.sh                              # all six targets, one self-contained file each
+./build.sh --targets "win-x64 osx-arm64"
+./build.sh --mode aot                   # native, this machine's OS only
+```
+
+| | x64 | arm64 |
+| --- | --- | --- |
+| Linux | `linux-x64` | `linux-arm64` |
+| Windows | `win-x64` | `win-arm64` |
+| macOS | `osx-x64` | `osx-arm64` |
+
+The default publish is self-contained and single-file — one executable per target with the .NET
+runtime and Avalonia's native libraries inside it, so there is nothing to install alongside it.
+Ahead-of-time compilation is available with `--mode aot`: faster to start and smaller, but it is
+**not** a single file (`libSkiaSharp` and `libHarfBuzzSharp` must stay beside the executable) and
+it cannot cross operating systems, so CI treats it as an opt-in extra rather than what ships.
 
 ### A note on the Avalonia version
 

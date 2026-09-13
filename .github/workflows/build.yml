@@ -1,0 +1,119 @@
+name: build
+
+# The .NET SDK cross-publishes self-contained apps from any host, so all six
+# targets are built on one runner. Each comes out as a single executable with
+# the runtime and Avalonia's native libraries inside it.
+#
+# Ahead-of-time compilation is the exception: it cannot cross operating systems,
+# and it leaves libSkiaSharp and libHarfBuzzSharp beside the executable rather
+# than inside it - so it is an opt-in extra, built per OS, not what ships.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      native:
+        description: 'Also build ahead-of-time native binaries'
+        type: boolean
+        default: false
+
+jobs:
+  # Nothing is built that the suite has not agreed to. The live-server tests skip
+  # themselves when no database answers, which is exactly the case on a runner, so
+  # the rest of the suite still gates the build.
+  test:
+    name: tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run the suite
+        run: dotnet test --configuration Release --logger 'console;verbosity=normal'
+
+  single-file:
+    name: single file
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build every target
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          [[ "$GITHUB_REF_TYPE" == "tag" ]] || version="0.0.0-dev+${GITHUB_SHA::7}"
+          ./build.sh --version "$version"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CCReimagined
+          path: dist/CCReimagined-*
+
+  native:
+    name: native ${{ matrix.rid }}
+    needs: test
+    if: inputs.native
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: linux-x64,   os: ubuntu-latest }
+          - { rid: linux-arm64, os: ubuntu-24.04-arm }
+          - { rid: win-x64,     os: windows-latest }
+          - { rid: win-arm64,   os: windows-11-arm }
+          - { rid: osx-x64,     os: macos-13 }
+          - { rid: osx-arm64,   os: macos-14 }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # The native compiler shells out to clang and needs zlib's headers.
+      - name: Install the native toolchain
+        if: startsWith(matrix.rid, 'linux')
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+
+      - name: Build
+        shell: bash
+        run: ./build.sh --mode aot --targets "${{ matrix.rid }}" --version "0.0.0-native"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CCReimagined-native-${{ matrix.rid }}
+          path: dist/CCReimagined-*
+
+  release:
+    needs: single-file
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
