@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CCReimagined.App/CCReimagined.App.csproj" />
+    <Project Path="src/CCReimagined.Core/CCReimagined.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CCReimagined.Core.Tests/CCReimagined.Core.Tests.csproj" />
+  </Folder>
+</Solution>

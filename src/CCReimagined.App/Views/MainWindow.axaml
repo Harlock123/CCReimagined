@@ -1,0 +1,423 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:CCReimagined.App.ViewModels"
+        xmlns:models="using:CCReimagined.App.Models"
+        xmlns:core="using:CCReimagined.Core.Profiles"
+        xmlns:sc="clr-namespace:SyntaxColorizer.Controls;assembly=SyntaxColorizer"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="820"
+        x:Class="CCReimagined.App.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Width="1280" Height="820"
+        MinWidth="980" MinHeight="640"
+        Title="CCReimagined — data class generator">
+
+    <Design.DataContext>
+        <vm:MainViewModel />
+    </Design.DataContext>
+
+    <Window.KeyBindings>
+        <KeyBinding Gesture="Ctrl+Q" Command="{Binding ExitCommand}" />
+        <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveCommand}" />
+    </Window.KeyBindings>
+
+    <!-- macOS puts this in the system menu bar, which is also where its Cmd+Q lives. -->
+    <NativeMenu.Menu>
+        <NativeMenu>
+            <NativeMenuItem Header="File">
+                <NativeMenu>
+                    <NativeMenuItem Header="Save generated class..."
+                                    Command="{Binding SaveCommand}" />
+                    <NativeMenuItem Header="Copy generated class"
+                                    Command="{Binding CopyCommand}" />
+                    <NativeMenuItemSeparator />
+                    <NativeMenuItem Header="Quit CCReimagined"
+                                    Command="{Binding ExitCommand}" />
+                </NativeMenu>
+            </NativeMenuItem>
+        </NativeMenu>
+    </NativeMenu.Menu>
+
+    <Window.Styles>
+        <Style Selector="TextBlock.label">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Opacity" Value="0.75" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style Selector="TextBlock.section">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+        <Style Selector="Border.panel">
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseLowBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="10" />
+        </Style>
+    </Window.Styles>
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+        <!-- ================================================ menu bar -->
+        <Menu Grid.Row="0" IsVisible="{x:Static vm:MainViewModel.ShowsWindowMenu}">
+            <MenuItem Header="_File">
+                <MenuItem Header="_Save generated class..."
+                          Command="{Binding SaveCommand}"
+                          InputGesture="Ctrl+S" />
+                <MenuItem Header="_Copy generated class"
+                          Command="{Binding CopyCommand}" />
+                <Separator />
+                <MenuItem Header="E_xit"
+                          Command="{Binding ExitCommand}"
+                          InputGesture="Ctrl+Q" />
+            </MenuItem>
+            <MenuItem Header="_Database">
+                <MenuItem Header="_Connect"
+                          Command="{Binding ConnectCommand}" />
+                <MenuItem Header="_Disconnect"
+                          Command="{Binding DisconnectCommand}" />
+                <Separator />
+                <MenuItem Header="_Generate class"
+                          Command="{Binding GenerateCommand}" />
+            </MenuItem>
+        </Menu>
+
+        <!-- ================================================ connection bar -->
+        <Border Grid.Row="1" Classes="panel" Margin="8,8,8,4">
+            <StackPanel Spacing="8">
+
+                <Grid ColumnDefinitions="Auto,220,Auto,200,Auto" ColumnSpacing="8">
+                    <TextBlock Grid.Column="0" Classes="label" Text="Profile" />
+                    <ComboBox Grid.Column="1"
+                              HorizontalAlignment="Stretch"
+                              ItemsSource="{Binding Profiles}"
+                              SelectedItem="{Binding SelectedProfile}"
+                              PlaceholderText="no saved profiles"
+                              IsEnabled="{Binding HasProfiles}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="core:ConnectionProfile">
+                                <TextBlock Text="{Binding Name}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <TextBlock Grid.Column="2" Classes="label" Text="Save as" />
+                    <TextBox Grid.Column="3" Text="{Binding ProfileName}"
+                             Watermark="profile name" />
+
+                    <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="6">
+                        <Button Content="Save" Command="{Binding SaveProfileCommand}"
+                                ToolTip.Tip="Saves the connection fields under the name on the left. Passwords are never written to disk." />
+                        <Button Content="Delete" Command="{Binding DeleteProfileCommand}" />
+                    </StackPanel>
+                </Grid>
+
+                <Grid ColumnDefinitions="Auto,220,Auto,*,Auto,90,Auto" ColumnSpacing="8">
+                    <TextBlock Grid.Column="0" Classes="label" Text="Engine" />
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding Providers}"
+                              SelectedItem="{Binding SelectedProvider}"
+                              HorizontalAlignment="Stretch">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding DisplayName}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <TextBlock Grid.Column="2" Classes="label" Text="Server"
+                               IsVisible="{Binding NeedsHost}" />
+                    <TextBox Grid.Column="3" Text="{Binding Host}"
+                             Watermark="host name or address"
+                             IsVisible="{Binding NeedsHost}" />
+
+                    <TextBlock Grid.Column="4" Classes="label" Text="Port"
+                               IsVisible="{Binding NeedsHost}" />
+                    <TextBox Grid.Column="5" Text="{Binding Port}"
+                             IsVisible="{Binding NeedsHost}" />
+
+                    <StackPanel Grid.Column="6" Orientation="Horizontal" Spacing="6">
+                        <Button Content="Connect" Command="{Binding ConnectCommand}"
+                                IsDefault="True" IsEnabled="{Binding !IsBusy}" />
+                        <Button Content="Disconnect" Command="{Binding DisconnectCommand}"
+                                IsEnabled="{Binding IsConnected}" />
+                    </StackPanel>
+                </Grid>
+
+                <Grid ColumnDefinitions="Auto,*,Auto,160,Auto,160,Auto" ColumnSpacing="8">
+                    <TextBlock Grid.Column="0" Classes="label" Text="{Binding DatabaseLabel}" />
+                    <TextBox Grid.Column="1" Text="{Binding DatabaseOrPath}"
+                             Watermark="leave blank to browse the server's databases" />
+
+                    <CheckBox Grid.Column="2" Content="Integrated security"
+                              IsChecked="{Binding UseIntegratedSecurity}"
+                              IsEnabled="{Binding SupportsIntegratedAuth}" />
+
+                    <TextBox Grid.Column="3" Text="{Binding UserName}" Watermark="user"
+                             IsEnabled="{Binding NeedsCredentials}" />
+                    <TextBox Grid.Column="5" Text="{Binding Password}" Watermark="password"
+                             PasswordChar="•" IsEnabled="{Binding NeedsCredentials}" />
+
+                    <CheckBox Grid.Column="6" Content="Trust cert"
+                              IsChecked="{Binding TrustServerCertificate}" />
+                </Grid>
+
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                    <CheckBox Grid.Column="0" Content="Raw connection string"
+                              IsChecked="{Binding UseRawConnectionString}"
+                              ToolTip.Tip="Hand the provider a connection string verbatim, bypassing the fields above." />
+                    <TextBox Grid.Column="1" Text="{Binding RawConnectionString}"
+                             IsEnabled="{Binding UseRawConnectionString}"
+                             Watermark="provider-specific connection string" />
+                </Grid>
+
+            </StackPanel>
+        </Border>
+
+        <!-- ================================================ main work area -->
+        <Grid Grid.Row="2" Margin="8,4" ColumnDefinitions="300,8,*">
+
+            <!-- left: databases and relations -->
+            <Border Grid.Column="0" Classes="panel">
+                <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*">
+                    <TextBlock Grid.Row="0" Classes="section" Text="Databases" />
+
+                    <ListBox Grid.Row="1"
+                             MaxHeight="150"
+                             ItemsSource="{Binding Databases}"
+                             SelectedItem="{Binding SelectedDatabase}"
+                             IsVisible="{Binding SupportsDatabaseEnumeration}" />
+
+                    <TextBlock Grid.Row="2" Classes="label" Margin="0,2,0,8"
+                               Text="This engine holds a single database per file."
+                               TextWrapping="Wrap"
+                               IsVisible="{Binding !SupportsDatabaseEnumeration}" />
+
+                    <TextBlock Grid.Row="3" Classes="section" Margin="0,10,0,6"
+                               Text="Tables and views" />
+
+                    <TextBox Grid.Row="4" Text="{Binding RelationFilter}"
+                             Watermark="filter…" Margin="0,0,0,6" />
+
+                    <ListBox Grid.Row="5"
+                             ItemsSource="{Binding Relations}"
+                             SelectedItem="{Binding SelectedRelation}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="models:RelationRow">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Text="{Binding Display}"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="1" Classes="label"
+                                               Text="{Binding KindGlyph}" Margin="6,0,0,0" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+            <!-- right: columns, options, output -->
+            <TabControl Grid.Column="2" SelectedIndex="{Binding SelectedTabIndex}">
+
+                <TabItem Header="Schema">
+                    <Grid RowDefinitions="Auto,*" Margin="0,8,0,0">
+                        <TextBlock Grid.Row="0" Classes="label" Margin="4,0,0,8"
+                                   Text="{Binding SchemaSummary}" TextWrapping="Wrap" />
+
+                        <DataGrid Grid.Row="1"
+                                  ItemsSource="{Binding Columns}"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="False"
+                                  CanUserResizeColumns="True"
+                                  GridLinesVisibility="Horizontal"
+                                  HeadersVisibility="Column">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Column" Width="2*" IsReadOnly="True"
+                                                    Binding="{Binding Name}" />
+                                <DataGridTextColumn Header="Database type" Width="1.4*" IsReadOnly="True"
+                                                    Binding="{Binding TypeDisplay}" />
+                                <DataGridTextColumn Header="C# type" Width="1.2*" IsReadOnly="True"
+                                                    Binding="{Binding ClrTypeDisplay}" />
+                                <DataGridCheckBoxColumn Header="Null" Width="60" IsReadOnly="True"
+                                                        Binding="{Binding IsNullable}" />
+                                <DataGridCheckBoxColumn Header="Key" Width="60"
+                                                        Binding="{Binding IsKey}" />
+                                <DataGridCheckBoxColumn Header="List param" Width="90"
+                                                        Binding="{Binding IsListParameter}" />
+                                <DataGridTextColumn Header="Notes" Width="1.6*" IsReadOnly="True"
+                                                    Binding="{Binding Notes}" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </TabItem>
+
+                <TabItem Header="Generate">
+                    <ScrollViewer Margin="0,8,0,0">
+                        <StackPanel Spacing="12" Margin="4">
+
+                            <Border Classes="panel">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Classes="section" Text="Target" />
+
+                                    <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto"
+                                          ColumnSpacing="8" RowSpacing="8">
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Classes="label"
+                                                   Text="Emit code for" />
+                                        <ComboBox Grid.Row="0" Grid.Column="1"
+                                                  HorizontalAlignment="Stretch"
+                                                  ItemsSource="{Binding CodegenProfiles}"
+                                                  SelectedItem="{Binding SelectedCodegenProfile}"
+                                                  ToolTip.Tip="Defaults to the engine you browsed. Change it to emit a class for a different engine from the same schema.">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding DisplayName}" />
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Classes="label"
+                                                   Text="Namespace" />
+                                        <TextBox Grid.Row="1" Grid.Column="1"
+                                                 Text="{Binding TargetNamespace}" />
+
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Classes="label"
+                                                   Text="Class name" />
+                                        <TextBox Grid.Row="2" Grid.Column="1"
+                                                 Text="{Binding ClassName}"
+                                                 Watermark="derived from the relation name" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="panel">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Classes="section" Text="Members" />
+
+                                    <CheckBox Content="Blocking wrappers alongside the async methods"
+                                              IsChecked="{Binding GenerateSyncWrappers}" />
+                                    <CheckBox Content="RecExists"
+                                              IsChecked="{Binding GenerateRecExists}" />
+                                    <CheckBox Content="ReadAsDataTable"
+                                              IsChecked="{Binding GenerateReadAsDataTable}" />
+                                    <CheckBox Content="GetAll"
+                                              IsChecked="{Binding GenerateGetAll}" />
+                                    <CheckBox Content="Implement INotifyPropertyChanged"
+                                              IsChecked="{Binding ImplementInpc}" />
+                                    <CheckBox Content="sealed class"
+                                              IsChecked="{Binding SealedClass}" />
+
+                                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                                        <TextBlock Classes="label" Text="Row cap on list getters" />
+                                        <TextBox Text="{Binding ListMaxRows}" Width="80"
+                                                 ToolTip.Tip="0 means no cap." />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Classes="panel">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Classes="section" Text="Legacy behaviours" />
+
+                                    <CheckBox IsChecked="{Binding TruncateOverlongStrings}"
+                                              ToolTip.Tip="Setters trim values longer than the declared column length instead of letting the write fail.">
+                                        <TextBlock Text="Truncate overlong strings in setters" TextWrapping="Wrap" />
+                                    </CheckBox>
+
+                                    <CheckBox IsChecked="{Binding TreatEmptyStringAsNull}"
+                                              ToolTip.Tip="The original generator always did this. Off by default, because nullable property types let a caller say NULL outright.">
+                                        <TextBlock Text="Bind an empty string as NULL for nullable text columns" TextWrapping="Wrap" />
+                                    </CheckBox>
+                                </StackPanel>
+                            </Border>
+
+                            <Button Content="Generate class" HorizontalAlignment="Left"
+                                    Command="{Binding GenerateCommand}"
+                                    Classes="accent" Padding="18,8" />
+
+                            <Border Classes="panel" IsVisible="{Binding HasWarnings}">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Classes="section" Text="Warnings" />
+                                    <ItemsControl ItemsSource="{Binding Warnings}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding}" TextWrapping="Wrap"
+                                                           Margin="0,1" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <TabItem Header="Generated C#">
+                    <Grid RowDefinitions="Auto,*" Margin="0,8,0,0">
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8"
+                                    Margin="4,0,4,8">
+                            <TextBlock Classes="label" VerticalAlignment="Center"
+                                       Text="{Binding GeneratedFileName}" />
+                            <Button Content="Copy" Command="{Binding CopyCommand}"
+                                    IsEnabled="{Binding HasOutput}" />
+                            <Button Content="Save as…" Command="{Binding SaveCommand}"
+                                    IsEnabled="{Binding HasOutput}" />
+
+                            <TextBlock Classes="label" VerticalAlignment="Center"
+                                       Margin="12,0,0,0" Text="Theme" />
+                            <ComboBox Width="170"
+                                      ItemsSource="{Binding EditorThemes}"
+                                      SelectedItem="{Binding SelectedEditorTheme}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="models:EditorThemeOption">
+                                        <TextBlock Text="{Binding Name}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <sc:SyntaxHighlightingTextBox Grid.Row="1"
+                                                      Text="{Binding GeneratedCode}"
+                                                      Language="CSharp"
+                                                      SyntaxTheme="{Binding SelectedEditorTheme.Theme}"
+                                                      ShowLineNumbers="True"
+                                                      IsReadOnly="True"
+                                                      AcceptsReturn="True"
+                                                      AcceptsTab="True" />
+                    </Grid>
+                </TabItem>
+
+                <TabItem Header="Connection">
+                    <StackPanel Margin="8" Spacing="8">
+                        <TextBlock Classes="section" Text="Connection string in use" />
+                        <TextBox Text="{Binding EffectiveConnectionString}" IsReadOnly="True"
+                                 AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" />
+                        <TextBlock Classes="label" TextWrapping="Wrap"
+                                   Text="Composed by the selected provider from the fields above, or passed through verbatim when a raw connection string is used. A password typed into the fields appears here." />
+
+                        <TextBlock Classes="section" Margin="0,12,0,0" Text="Saved profiles" />
+                        <SelectableTextBlock Classes="label" TextWrapping="Wrap"
+                                             Text="{Binding ProfileStorePath}" />
+                        <TextBlock Classes="label" TextWrapping="Wrap"
+                                   Text="Profiles never hold a password. Password keywords are stripped even from a saved raw connection string, so the file is safe to sync between machines." />
+                    </StackPanel>
+                </TabItem>
+
+            </TabControl>
+        </Grid>
+
+        <!-- ================================================ status bar -->
+        <Border Grid.Row="3" Classes="panel" Margin="8,4,8,8" Padding="10,6">
+            <Grid ColumnDefinitions="Auto,*">
+                <ProgressBar Grid.Column="0" IsIndeterminate="True" Width="90" Height="4"
+                             Margin="0,0,10,0" VerticalAlignment="Center"
+                             IsVisible="{Binding IsBusy}" />
+                <TextBlock Grid.Column="1" Text="{Binding StatusMessage}"
+                           TextWrapping="Wrap" VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+
+    </Grid>
+</Window>

@@ -1,0 +1,22 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="CCReimagined.App.App"
+             xmlns:local="using:CCReimagined.App"
+             RequestedThemeVariant="Default">
+             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+
+    <Application.DataTemplates>
+        <local:ViewLocator />
+    </Application.DataTemplates>
+
+    <Application.Styles>
+        <FluentTheme />
+        <!-- The column grid on the Schema tab needs DataGrid's own theme resources. -->
+        <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml" />
+        <!--
+          SyntaxColorizer's control template. Without this the control instantiates but never
+          applies a template, so its editor is null and the generated code renders as blank space.
+        -->
+        <StyleInclude Source="avares://SyntaxColorizer/Controls/SyntaxHighlightingTextBox.axaml" />
+    </Application.Styles>
+</Application>
