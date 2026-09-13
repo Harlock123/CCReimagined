@@ -45,6 +45,36 @@ public sealed class AvaloniaShellServices : IShellServices
         return file.TryGetLocalPath() ?? file.Name;
     }
 
+    public async Task<string?> PickDatabaseFileAsync(string? startingDirectory)
+    {
+        IStorageFolder? start = null;
+
+        if (!string.IsNullOrWhiteSpace(startingDirectory) && Directory.Exists(startingDirectory))
+            start = await _topLevel.StorageProvider.TryGetFolderFromPathAsync(startingDirectory);
+
+        var files = await _topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Open database file",
+            AllowMultiple = false,
+            SuggestedStartLocation = start,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("SQLite database")
+                {
+                    // SQLite imposes no extension, so the common ones plus a fallback to All.
+                    Patterns = ["*.db", "*.db3", "*.sqlite", "*.sqlite3", "*.s3db"],
+                },
+                FilePickerFileTypes.All,
+            ],
+        });
+
+        var file = files.Count > 0 ? files[0] : null;
+
+        // A path is what the provider needs; a file the picker cannot express as one
+        // (a remote or virtual location) is no use here.
+        return file?.TryGetLocalPath();
+    }
+
     public void Shutdown()
     {
         // Shutting the lifetime down closes every window and runs the normal exit path. Closing

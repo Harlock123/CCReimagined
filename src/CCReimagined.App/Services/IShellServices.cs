@@ -18,6 +18,12 @@ public interface IShellServices
     Task<string?> SaveTextFileAsync(string suggestedFileName, string content);
 
     /// <summary>
+    /// Prompts for an existing database file. Returns the chosen path, or null when the user
+    /// cancelled. <paramref name="startingDirectory"/> is a hint, ignored when it does not exist.
+    /// </summary>
+    Task<string?> PickDatabaseFileAsync(string? startingDirectory);
+
+    /// <summary>
     /// Ends the application. Hyprland and most tiling window managers can close any focused
     /// window, but a desktop that cannot leaves the user stuck, so the app offers its own way out.
     /// </summary>

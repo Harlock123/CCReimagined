@@ -50,6 +50,20 @@ public sealed class ShellCommandTests : IDisposable
             return Task.FromResult(SaveResult);
         }
 
+        /// <summary>Null stands for the user cancelling the file picker.</summary>
+        public string? PickResult { get; set; }
+
+        public string? PickStartedIn { get; private set; }
+
+        public int PickCalls { get; private set; }
+
+        public Task<string?> PickDatabaseFileAsync(string? startingDirectory)
+        {
+            PickCalls++;
+            PickStartedIn = startingDirectory;
+            return Task.FromResult(PickResult);
+        }
+
         public void Shutdown() => ShutdownCalls++;
     }
 
@@ -130,6 +144,58 @@ public sealed class ShellCommandTests : IDisposable
         await vm.SaveCommand.ExecuteAsync(null);
 
         Assert.False(vm.StatusIsError);
+    }
+
+    [Fact]
+    public async Task Browse_puts_the_chosen_file_in_the_database_field()
+    {
+        var shell = new FakeShell { PickResult = "/data/warehouse.db" };
+        var vm = WithShell(shell);
+
+        await vm.BrowseDatabaseFileCommand.ExecuteAsync(null);
+
+        Assert.Equal("/data/warehouse.db", vm.DatabaseOrPath);
+        Assert.Equal(1, shell.PickCalls);
+    }
+
+    [Fact]
+    public async Task Cancelling_the_browse_leaves_the_field_alone()
+    {
+        var shell = new FakeShell { PickResult = null };
+        var vm = WithShell(shell);
+        vm.DatabaseOrPath = "/data/existing.db";
+
+        await vm.BrowseDatabaseFileCommand.ExecuteAsync(null);
+
+        Assert.Equal("/data/existing.db", vm.DatabaseOrPath);
+    }
+
+    [Fact]
+    public async Task Browse_opens_where_the_current_path_points()
+    {
+        var shell = new FakeShell();
+        var vm = WithShell(shell);
+
+        // A tilde path has to be resolved first, or the picker is handed a directory
+        // that does not exist and silently starts somewhere else.
+        vm.DatabaseOrPath = "~/somewhere-that-does-not-exist/app.db";
+        await vm.BrowseDatabaseFileCommand.ExecuteAsync(null);
+        Assert.Null(shell.PickStartedIn);
+
+        var real = Path.GetTempPath().TrimEnd(Path.DirectorySeparatorChar);
+        vm.DatabaseOrPath = Path.Combine(real, "app.db");
+        await vm.BrowseDatabaseFileCommand.ExecuteAsync(null);
+        Assert.Equal(real, shell.PickStartedIn?.TrimEnd(Path.DirectorySeparatorChar));
+    }
+
+    [Fact]
+    public async Task Browse_without_a_shell_does_nothing()
+    {
+        var vm = new MainViewModel(TempStore());
+
+        await vm.BrowseDatabaseFileCommand.ExecuteAsync(null);
+
+        Assert.Equal("", vm.DatabaseOrPath);
     }
 
     [Fact]

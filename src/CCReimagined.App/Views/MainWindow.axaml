@@ -148,8 +148,14 @@
 
                 <Grid ColumnDefinitions="Auto,*,Auto,160,Auto,160,Auto" ColumnSpacing="8">
                     <TextBlock Grid.Column="0" Classes="label" Text="{Binding DatabaseLabel}" />
-                    <TextBox Grid.Column="1" Text="{Binding DatabaseOrPath}"
-                             Watermark="leave blank to browse the server's databases" />
+                    <!-- The Browse button only appears for a file-backed engine such as SQLite. -->
+                    <Grid Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                        <TextBox Grid.Column="0" Text="{Binding DatabaseOrPath}"
+                                 Watermark="leave blank to browse the server's databases" />
+                        <Button Grid.Column="1" Content="Browse..."
+                                Command="{Binding BrowseDatabaseFileCommand}"
+                                IsVisible="{Binding DatabaseIsFilePath}" />
+                    </Grid>
 
                     <CheckBox Grid.Column="2" Content="Integrated security"
                               IsChecked="{Binding UseIntegratedSecurity}"

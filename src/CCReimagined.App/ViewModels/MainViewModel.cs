@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -412,6 +413,28 @@ public partial class MainViewModel : ViewModelBase
         {
             Fail($"Could not save: {ex.Message}");
         }
+    }
+
+    [RelayCommand]
+    private async Task BrowseDatabaseFileAsync()
+    {
+        if (Shell is null)
+            return;
+
+        // Open the picker where the current path points, so correcting a typo does not mean
+        // navigating from the top again.
+        var current = FilePath.Resolve(DatabaseOrPath);
+        var startIn = Path.GetDirectoryName(current) is { Length: > 0 } dir && Directory.Exists(dir)
+            ? dir
+            : null;
+
+        var chosen = await Shell.PickDatabaseFileAsync(startIn);
+
+        if (chosen is null)
+            return;
+
+        DatabaseOrPath = chosen;
+        Report($"Selected {chosen}.");
     }
 
     [RelayCommand]
