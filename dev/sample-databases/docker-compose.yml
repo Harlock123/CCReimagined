@@ -1,0 +1,128 @@
+# Sample database servers for exercising CCReimagined against every provider it supports.
+#
+#   docker compose up -d            start everything
+#   docker compose ps               watch the health checks go healthy
+#   docker compose down -v          stop and delete the data volumes
+#
+# Each server seeds itself on first start from the matching directory under ./seed.
+# Delete the volumes (-v) to re-run the seed after editing it.
+#
+# On this aarch64 machine PostgreSQL, MySQL and MariaDB run natively. SQL Server does
+# not: Microsoft publishes it for amd64 only, so that one service is pinned to
+# linux/amd64 and runs under emulation. See README.md in this directory.
+
+name: ccreimagined-samples
+
+services:
+
+  postgres:
+    image: postgres:18
+    container_name: ccr-postgres
+    environment:
+      POSTGRES_USER: ccr
+      POSTGRES_PASSWORD: ccr_dev_password
+      POSTGRES_DB: ccrsample
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./seed/postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ccr -d ccrsample"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  mysql:
+    image: mysql:8.4
+    container_name: ccr-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ccr_dev_password
+      MYSQL_DATABASE: ccrsample
+      MYSQL_USER: ccr
+      MYSQL_PASSWORD: ccr_dev_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./seed/mysql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uccr", "-pccr_dev_password"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  mariadb:
+    image: mariadb:11.8
+    container_name: ccr-mariadb
+    environment:
+      MARIADB_ROOT_PASSWORD: ccr_dev_password
+      MARIADB_DATABASE: ccrsample
+      MARIADB_USER: ccr
+      MARIADB_PASSWORD: ccr_dev_password
+    # 3307 so MariaDB and MySQL can run side by side; the provider is the same either way.
+    ports:
+      - "3307:3306"
+    volumes:
+      - mariadb-data:/var/lib/mysql
+      - ./seed/mariadb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  sqlserver:
+    # amd64 only — Microsoft publishes no arm64 build, so this runs under qemu here.
+    # Slow to start (a minute or two), then fine for the metadata queries this tool makes.
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    container_name: ccr-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "ccr_Dev_Password1"
+      MSSQL_PID: Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q "SELECT 1" -b
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 120s
+    profiles:
+      # Kept out of the default `up` because it needs emulation. Start it with:
+      #   docker compose --profile mssql up -d
+      - mssql
+
+  # SQL Server has no init-script convention, so a one-shot companion applies the seed
+  # once the server reports healthy, then exits.
+  sqlserver-seed:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    container_name: ccr-sqlserver-seed
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    volumes:
+      - ./seed/sqlserver:/seed:ro
+    entrypoint:
+      - /bin/bash
+      - -c
+      - /opt/mssql-tools18/bin/sqlcmd -S sqlserver -U sa -P "ccr_Dev_Password1" -C -b -i /seed/01-schema.sql
+    restart: "no"
+    profiles:
+      - mssql
+
+volumes:
+  postgres-data:
+  mysql-data:
+  mariadb-data:
+  sqlserver-data:
