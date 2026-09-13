@@ -25,7 +25,10 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      # Postgres 18 moved the expected mount point up a level: it manages a
+      # major-version subdirectory under /var/lib/postgresql itself, so mounting at
+      # .../data (the pre-18 convention) makes the container refuse to start.
+      - postgres-data:/var/lib/postgresql
       - ./seed/postgres:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ccr -d ccrsample"]
