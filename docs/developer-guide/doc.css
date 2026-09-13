@@ -1,0 +1,75 @@
+@page { size: A4; margin: 16mm 14mm 14mm 14mm; }
+
+:root{
+  --ink:#14181d; --muted:#5b6672; --line:#d8dee6; --rule:#b9c3ce;
+  --accent:#1f5fa8; --wash:#f4f7fa; --code-bg:#f7f9fb;
+  --pg:#2f6fae; --my:#a06a12; --ss:#a03535; --lt:#2e7d52;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; color:var(--ink); background:#fff;
+  font:10.5pt/1.5 "Source Sans 3","Segoe UI",Inter,system-ui,-apple-system,sans-serif;
+  -webkit-print-color-adjust:exact; print-color-adjust:exact;
+}
+code,pre{font-family:"JetBrains Mono","Cascadia Mono","DejaVu Sans Mono",ui-monospace,monospace}
+
+h1{font-size:26pt;line-height:1.15;margin:0 0 6pt;letter-spacing:-.4pt}
+h2{font-size:14pt;margin:0 0 8pt;padding-bottom:4pt;border-bottom:1.5pt solid var(--rule);letter-spacing:-.2pt}
+h3{font-size:11pt;margin:14pt 0 5pt;color:var(--accent)}
+p{margin:0 0 8pt}
+ul,ol{margin:0 0 8pt;padding-left:16pt}
+li{margin:0 0 3pt}
+a{color:var(--accent);text-decoration:none}
+small{font-size:8.5pt;color:var(--muted)}
+
+/* Only the cover gets a forced break; everything else flows and is kept together
+   by the rules below, which avoids half-empty pages at each chapter end. */
+.cover{page-break-after:always}
+.page + .page > section:first-child > h2{page-break-before:auto}
+/* Let prose reflow across pages, but never split a figure, a table or a code pair. */
+figure,table,.grid2,.steps{page-break-inside:avoid}
+h2,h3{page-break-after:avoid}
+
+.cover{padding-top:38mm}
+.cover .kicker{font-size:9pt;letter-spacing:2.2pt;text-transform:uppercase;color:var(--muted);margin-bottom:10pt}
+.cover .sub{font-size:13pt;color:var(--muted);margin:6pt 0 22pt;line-height:1.45}
+.cover .meta{margin-top:30mm;border-top:1.5pt solid var(--rule);padding-top:8pt;
+  display:grid;grid-template-columns:repeat(4,1fr);gap:10pt;font-size:8.5pt;color:var(--muted)}
+.cover .meta b{display:block;color:var(--ink);font-size:9.5pt;font-weight:600;margin-bottom:1pt}
+
+.lede{font-size:11.5pt;line-height:1.55;color:#2c343d;border-left:2.5pt solid var(--accent);
+  padding-left:10pt;margin:0 0 14pt}
+
+figure{margin:0 0 10pt}
+figure img{width:100%;border:0.6pt solid var(--line);border-radius:2pt;display:block}
+figcaption{font-size:8.5pt;color:var(--muted);margin-top:4pt;line-height:1.4}
+
+table{width:100%;border-collapse:collapse;font-size:9pt;margin:0 0 10pt}
+th{text-align:left;font-weight:600;font-size:8pt;text-transform:uppercase;letter-spacing:.6pt;
+  color:var(--muted);border-bottom:1pt solid var(--rule);padding:4pt 6pt 4pt 0}
+td{padding:4pt 6pt 4pt 0;border-bottom:0.5pt solid var(--line);vertical-align:top}
+td code{font-size:8.5pt}
+tr:last-child td{border-bottom:none}
+
+pre{background:var(--code-bg);border:0.6pt solid var(--line);border-left:2.5pt solid var(--rule);
+  border-radius:2pt;padding:7pt 9pt;font-size:8.2pt;line-height:1.45;overflow:hidden;
+  white-space:pre-wrap;margin:0 0 8pt}
+pre b{font-weight:700;background:#fff2b8;padding:0 1pt;border-radius:1pt}
+pre i{font-style:normal;color:var(--muted)}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:9pt}
+.grid2 pre{margin:0}
+.eng{font-size:8pt;font-weight:700;letter-spacing:.5pt;text-transform:uppercase;margin:0 0 3pt}
+.eng.pg{color:var(--pg)} .eng.my{color:var(--my)} .eng.ss{color:var(--ss)} .eng.lt{color:var(--lt)}
+
+.callout{background:var(--wash);border:0.6pt solid var(--line);border-radius:3pt;padding:8pt 10pt;margin:0 0 10pt}
+.callout p:last-child{margin-bottom:0}
+.callout .t{font-weight:600;margin-bottom:3pt}
+
+.steps{counter-reset:s;list-style:none;padding:0;margin:0 0 10pt}
+.steps li{counter-increment:s;position:relative;padding-left:20pt;margin-bottom:6pt}
+.steps li::before{content:counter(s);position:absolute;left:0;top:0.5pt;width:14pt;height:14pt;
+  background:var(--accent);color:#fff;border-radius:50%;font-size:8pt;font-weight:700;
+  display:flex;align-items:center;justify-content:center}
+
+.foot{margin-top:12pt;padding-top:6pt;border-top:0.6pt solid var(--line);font-size:8pt;color:var(--muted)}

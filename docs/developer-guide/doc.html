@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CCReimagined — Developer Guide</title>
+<link rel="stylesheet" href="doc.css">
+</head>
+<body>
+
+<!-- ══════════════════════════════ COVER ══════════════════════════════ -->
+<div class="page cover">
+  <div class="kicker">Developer Guide</div>
+  <h1>CCReimagined</h1>
+  <div class="sub">
+    The CodeComplete data-class generator, rebuilt for macOS, Windows and Linux —
+    and no longer tied to SQL Server.
+  </div>
+
+  <p class="lede">
+    Point it at a table on any of four database engines and it writes the same data-abstraction
+    class you have been using for years. The shape of that class never changes. What changes is
+    everything underneath it: the client library, the parameter types, the SQL quoting, and the
+    way a new row's key comes back.
+  </p>
+
+  <p>
+    This guide shows the tool running against live PostgreSQL and SQL Server instances, and puts
+    the generated output for the same table side by side across all four engines so you can see
+    exactly what stays the same and what adapts.
+  </p>
+
+  <div class="meta">
+    <div><b>Engines</b>SQL Server · PostgreSQL<br>MySQL / MariaDB · SQLite</div>
+    <div><b>Runs on</b>macOS, Windows, Linux<br>Avalonia, .NET 10</div>
+    <div><b>Replaces</b>TAICodeComplete<br>(WinForms, SQL Server only)</div>
+    <div><b>Repository</b>Harlock123/CCReimagined<br>private</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ WHAT / QUICK START ══════════════════════════════ -->
+<div class="page">
+  <section>
+    <h2>What it does, and what has changed</h2>
+    <p>
+      The job is the same as it always was. You choose a table or view; the tool reads its columns
+      from the database catalog and writes a <code>partial</code> C# class with a property per
+      column and a full set of CRUD methods. You still choose which column is the key, and which
+      columns become parameters on the list getters.
+    </p>
+    <p>Three things are different:</p>
+    <ul>
+      <li><b>It runs natively on macOS, Windows and Linux.</b> The WinForms original ran on Windows only.</li>
+      <li><b>It speaks four engines,</b> and the code it writes targets whichever one you point it at.</li>
+      <li><b>The engine you browse and the engine you emit for are separate choices.</b> Read a SQL
+          Server schema, emit an Npgsql class. That is what porting a table between engines needs.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h3>Five minutes to your first class</h3>
+    <ol class="steps">
+      <li><b>Pick the engine</b> and fill in the server, database and credentials. Press <b>Connect</b>.
+          <br><small>For PostgreSQL, untick <i>Integrated security</i> first — it is ticked by default
+          because peer authentication is its equivalent, and while it is ticked no password is sent.</small></li>
+      <li><b>Press Save</b> with a name. The connection comes back next launch. The password is
+          never written to disk, so that one field is retyped.</li>
+      <li><b>Pick a table or view</b> from the list. Type in the filter box to narrow it.</li>
+      <li><b>Check the key column</b> in the grid. The tool picks one and tells you how confident it
+          is; the tick is yours to move.</li>
+      <li><b>Tick any columns</b> you want a <code>GetListBy…</code> method for.</li>
+      <li><b>Generate class.</b> The output tab comes forward. <b>Copy</b>, or <b>Save as…</b> into your project.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h3>Connecting</h3>
+    <figure>
+      <img src="images/shot-pg-schema.png" alt="CCReimagined connected to PostgreSQL showing the member table columns">
+      <figcaption>
+        Connected to a live PostgreSQL 18 instance. The left rail lists databases, then tables and
+        views. The grid is the discovered schema for <code>public.member</code> — and the column
+        that matters most here is <b>C# type</b>, which is covered on the next page.
+      </figcaption>
+    </figure>
+  </section>
+</div>
+
+<!-- ══════════════════════════════ TYPE AWARENESS ══════════════════════════════ -->
+<div class="page">
+  <section>
+    <h2>The generated code is database-type aware</h2>
+    <p>
+      Every provider maps its own native type names onto one neutral set of CLR types during
+      discovery. That mapping is what you see in the <b>C# type</b> column, and it is what the
+      generated properties are declared as.
+    </p>
+
+    <table>
+      <thead><tr><th style="width:22%">C# property</th><th style="width:19.5%">SQL Server</th><th style="width:19.5%">PostgreSQL</th><th style="width:19.5%">MySQL</th><th style="width:19.5%">SQLite</th></tr></thead>
+      <tbody>
+        <tr><td><code>int</code> / <code>long</code></td><td><code>int</code>, <code>bigint</code></td><td><code>integer</code>, <code>bigint</code></td><td><code>INT</code>, <code>BIGINT</code></td><td><code>INTEGER</code></td></tr>
+        <tr><td><code>string</code></td><td><code>nvarchar</code>, <code>varchar</code>, <code>text</code></td><td><code>varchar</code>, <code>text</code>, <code>json</code></td><td><code>VARCHAR</code>, <code>TEXT</code>, <code>JSON</code></td><td><code>VARCHAR</code>, <code>TEXT</code>, <code>CLOB</code></td></tr>
+        <tr><td><code>decimal</code></td><td><code>decimal</code>, <code>money</code></td><td><code>numeric</code>, <code>money</code></td><td><code>DECIMAL</code></td><td><code>DECIMAL</code></td></tr>
+        <tr><td><code>bool</code></td><td><code>bit</code></td><td><code>boolean</code></td><td><code>TINYINT(1)</code></td><td><code>BOOLEAN</code></td></tr>
+        <tr><td><code>DateOnly</code></td><td><code>date</code></td><td><code>date</code></td><td><code>DATE</code></td><td><code>DATE</code></td></tr>
+        <tr><td><code>DateTime</code></td><td><code>datetime2</code></td><td><code>timestamp</code></td><td><code>DATETIME</code></td><td><code>DATETIME</code></td></tr>
+        <tr><td><code>DateTimeOffset</code></td><td><code>datetimeoffset</code></td><td><code>timestamptz</code></td><td>—</td><td>—</td></tr>
+        <tr><td><code>Guid</code></td><td><code>uniqueidentifier</code></td><td><code>uuid</code></td><td><code>CHAR(36)</code></td><td><code>GUID</code></td></tr>
+        <tr><td><code>byte[]</code></td><td><code>varbinary</code>, <code>image</code></td><td><code>bytea</code></td><td><code>BLOB</code></td><td><code>BLOB</code></td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <div class="t">Nullability is carried through, not guessed</div>
+      <p>
+        A nullable column becomes a nullable property — <code>string?</code>, <code>DateOnly?</code>,
+        <code>decimal?</code>. The classes the old tool wrote used sentinel values instead
+        (<code>""</code>, a minimum date), so "not set" and "legitimately empty" were
+        indistinguishable once the row came back. They are distinguishable now.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h3>The same column, four engines</h3>
+    <p>
+      <code>date_of_birth</code> is declared <code>date</code> on PostgreSQL and SQL Server,
+      <code>DATE</code> on MySQL, and <code>DATE</code> on SQLite. In all four the property is
+      identical, and only the parameter type differs:
+    </p>
+    <div class="grid2">
+      <div><div class="eng ss">SQL Server · Microsoft.Data.SqlClient</div>
+<pre>public DateOnly? date_of_birth { get; set; }
+
+Bind(command, "@p_date_of_birth",
+     <b>System.Data.SqlDbType.Date</b>,
+     _date_of_birth?.ToDateTime(TimeOnly.MinValue));</pre></div>
+      <div><div class="eng pg">PostgreSQL · Npgsql</div>
+<pre>public DateOnly? date_of_birth { get; set; }
+
+Bind(command, "@p_date_of_birth",
+     <b>NpgsqlTypes.NpgsqlDbType.Date</b>,
+     _date_of_birth?.ToDateTime(TimeOnly.MinValue));</pre></div>
+      <div><div class="eng my">MySQL · MySqlConnector</div>
+<pre>public DateOnly? date_of_birth { get; set; }
+
+Bind(command, "@p_date_of_birth",
+     <b>MySqlConnector.MySqlDbType.Date</b>,
+     _date_of_birth?.ToDateTime(TimeOnly.MinValue));</pre></div>
+      <div><div class="eng lt">SQLite · Microsoft.Data.Sqlite</div>
+<pre>public DateOnly? date_of_birth { get; set; }
+
+Bind(command, "@p_date_of_birth",
+     <b>Microsoft.Data.Sqlite.SqliteType.Text</b>,
+     _date_of_birth?.ToDateTime(TimeOnly.MinValue));</pre></div>
+    </div>
+    <p><small>
+      SQLite stores dates as text — that is the engine's design, not a shortcut. The property is
+      still <code>DateOnly?</code>, so your code does not care.
+    </small></p>
+  </section>
+</div>
+
+<!-- ══════════════════════════════ SAME PATTERNS ══════════════════════════════ -->
+<div class="page">
+  <section>
+    <h2>The patterns are identical across every engine</h2>
+    <p>
+      This is the part that matters for a team. Whatever database a class was generated against,
+      it exposes exactly the same members, with the same names and the same signatures. Nobody has
+      to learn a second idiom because a project moved to Postgres.
+    </p>
+
+    <table>
+      <thead><tr><th style="width:34%">Member</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>Initialize()</code></td><td>Resets every mapped column to its default.</td></tr>
+        <tr><td><code>CopyFields(DbDataReader)</code></td><td>Copies the current row in. Columns absent from the result set are left alone, so a partial SELECT is fine.</td></tr>
+        <tr><td><code>ReadAsync(id)</code></td><td>Loads one row by key. Returns <code>false</code> when there is no such row.</td></tr>
+        <tr><td><code>AddAsync()</code></td><td>Inserts, and reads the database-generated key back into the property.</td></tr>
+        <tr><td><code>UpdateAsync()</code></td><td>Writes every writable column back. Returns rows affected.</td></tr>
+        <tr><td><code>DeleteAsync()</code></td><td>Deletes by key. Returns rows affected.</td></tr>
+        <tr><td><code>RecExistsAsync(id)</code></td><td>True when a row with that key exists.</td></tr>
+        <tr><td><code>ReadAsDataTableAsync(id)</code></td><td>The portable replacement for the old <code>ReadAsDataSet</code>.</td></tr>
+        <tr><td><code>GetAllAsync(cs)</code></td><td>Every row, optionally row-capped.</td></tr>
+        <tr><td><code>GetListBy<i>Column</i>Async(cs, value)</code></td><td>One per column you ticked as a list parameter.</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      Each async method has an optional blocking wrapper (<code>Read</code>, <code>Add</code>,
+      <code>Update</code>, <code>Delete</code>…) for callers that cannot await.
+    </p>
+  </section>
+
+  <section>
+    <h3>What adapts underneath</h3>
+    <p>Four things change per engine, and nothing else:</p>
+    <table>
+      <thead><tr><th style="width:16%"></th><th style="width:23%">SQL Server</th><th style="width:23%">PostgreSQL</th><th style="width:19%">MySQL</th><th style="width:19%">SQLite</th></tr></thead>
+      <tbody>
+        <tr><td><b>Client</b></td><td><code>SqlConnection</code></td><td><code>NpgsqlConnection</code></td><td><code>MySqlConnection</code></td><td><code>SqliteConnection</code></td></tr>
+        <tr><td><b>Parameter type</b></td><td><code>SqlDbType</code></td><td><code>NpgsqlDbType</code></td><td><code>MySqlDbType</code></td><td><code>SqliteType</code></td></tr>
+        <tr><td><b>Quoting</b></td><td><code>[name]</code></td><td><code>"name"</code></td><td><code>`name`</code></td><td><code>"name"</code></td></tr>
+        <tr><td><b>New key</b></td><td><code>SCOPE_IDENTITY()</code></td><td><code>RETURNING</code></td><td><code>LAST_INSERT_ID()</code></td><td><code>last_insert_rowid()</code></td></tr>
+      </tbody>
+    </table>
+
+    <p>You can see all four in the INSERT statement the generator emits for the same table:</p>
+
+    <div class="grid2">
+      <div><div class="eng ss">SQL Server</div>
+<pre>INSERT INTO <b>[dbo].[member]</b> (
+    [last_name], [first_name], [date_of_birth], …
+)
+VALUES (
+    @p_last_name, @p_first_name, @p_date_of_birth, …
+);
+<b>SELECT CAST(SCOPE_IDENTITY() AS bigint);</b></pre></div>
+      <div><div class="eng pg">PostgreSQL</div>
+<pre>INSERT INTO <b>"public"."member"</b> (
+    "last_name", "first_name", "date_of_birth", …
+)
+VALUES (
+    @p_last_name, @p_first_name, @p_date_of_birth, …
+)
+<b>RETURNING "member_id"</b></pre></div>
+      <div><div class="eng my">MySQL / MariaDB</div>
+<pre>INSERT INTO <b>`member`</b> (
+    `last_name`, `first_name`, `date_of_birth`, …
+)
+VALUES (
+    @p_last_name, @p_first_name, @p_date_of_birth, …
+);
+<b>SELECT LAST_INSERT_ID();</b></pre></div>
+      <div><div class="eng lt">SQLite</div>
+<pre>INSERT INTO <b>"member"</b> (
+    "last_name", "first_name", "date_of_birth", …
+)
+VALUES (
+    @p_last_name, @p_first_name, @p_date_of_birth, …
+);
+<b>SELECT last_insert_rowid();</b></pre></div>
+    </div>
+
+    <p><small>
+      The SQL lives in <code>const</code> raw string literals at the top of the generated class, so
+      it is reviewable in a diff rather than assembled at runtime.
+    </small></p>
+  </section>
+</div>
+
+<!-- ══════════════════════════════ OUTPUT + BEHAVIOUR ══════════════════════════════ -->
+<div class="page">
+  <section>
+    <h2>The output</h2>
+    <figure>
+      <img src="images/shot-pg-code.png" alt="The Generated C# tab showing a class generated for PostgreSQL">
+      <figcaption>
+        The same table, generated for PostgreSQL: 504 lines, <code>using Npgsql</code>. The header
+        records the source relation, the target provider and the NuGet package the file needs, so a
+        class that turns up in a code review explains itself.
+      </figcaption>
+    </figure>
+
+    <p>
+      The class is <code>partial</code> and the header says so: regenerating overwrites the file, so
+      hand-written members belong in a second file beside it.
+    </p>
+  </section>
+
+  <section>
+    <h3>Tables the old tool refused</h3>
+    <figure>
+      <img src="images/shot-pg-assumedkey.png" alt="The tool generating for a table with a composite primary key">
+      <figcaption>
+        A composite-key table. There is no auto-numbering column, so the tool names the one it
+        assumed and carries on — the tick in the <b>Key</b> column is yours to move. The original
+        stopped at a modal dialog here.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h3>Worth knowing before you regenerate an old class</h3>
+    <p>Some behaviours were corrected rather than carried across. If you are replacing a class the old tool wrote, expect these:</p>
+    <table>
+      <thead><tr><th style="width:30%">Then</th><th>Now</th></tr></thead>
+      <tbody>
+        <tr><td>Nullable columns used sentinels</td><td>Nullable columns are nullable properties. Empty-string-as-NULL is still available as an opt-in.</td></tr>
+        <tr><td><code>INTERVIEWER</code> renamed because it contains <code>int</code></td><td>Reserved words are matched exactly. Only a column actually named <code>int</code> or <code>class</code> gets escaped.</td></tr>
+        <tr><td>Columns ordered alphabetically</td><td>Columns follow the table's declared order.</td></tr>
+        <tr><td>Only <code>IDENTITY</code> counted as generated</td><td>Also <code>serial</code>, <code>AUTO_INCREMENT</code>, and SQLite's rowid alias.</td></tr>
+        <tr><td><code>ReadAsDataSet</code></td><td><code>ReadAsDataTableAsync</code> — not every provider ships a <code>DataAdapter</code>.</td></tr>
+        <tr><td>Synchronous only</td><td>Async throughout, with blocking wrappers kept.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h3>How far it is verified</h3>
+    <p>
+      For each engine the test suite creates a table, discovers it, generates the class,
+      <b>compiles that class with Roslyn</b>, and then drives insert, key read-back, read, update,
+      exists, both list getters and delete <b>against a real server</b>. Generated code that does
+      not build, or does not round-trip a row, fails the build.
+    </p>
+    <div class="callout">
+      <div class="t">Getting the sample databases</div>
+      <p>
+        <code>dev/sample-databases</code> in the repository has a Docker Compose stack for all four
+        engines and a schema built to exercise the awkward cases — keyless tables, composite keys,
+        computed columns, and column names that are C# keywords. Its README lists every connection
+        parameter.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Running it yourself</h2>
+    <p>The repository is <code>Harlock123/CCReimagined</code>. You need the .NET 10 SDK and nothing else.</p>
+<pre><i># build and run the app</i>
+git clone https://github.com/Harlock123/CCReimagined.git
+cd CCReimagined
+dotnet run --project src/CCReimagined.App
+
+<i># optional: sample databases to try it against</i>
+cd dev/sample-databases
+docker compose up -d                       <i># PostgreSQL, MySQL, MariaDB</i>
+./make-sqlite.sh                           <i># SQLite, no container needed</i>
+docker compose --profile mssql up -d       <i># SQL Server (amd64 hosts)</i>
+./seed-sqlserver.sh                        <i># apply the sample schema to it</i></pre>
+
+    <table>
+      <thead><tr><th style="width:26%">Shortcut</th><th>Does</th></tr></thead>
+      <tbody>
+        <tr><td><code>Ctrl+S</code> / <code>Cmd+S</code></td><td>Save the generated class to a file</td></tr>
+        <tr><td><code>Ctrl+Q</code> / <code>Cmd+Q</code></td><td>Quit — also <b>File &rsaquo; Exit</b></td></tr>
+        <tr><td><b>Database</b> menu</td><td>Connect, Disconnect, Generate class</td></tr>
+      </tbody>
+    </table>
+
+    <p>
+      Connection profiles are stored per user — <code>~/.config/CCReimagined</code> on Linux,
+      <code>~/Library/Application Support/CCReimagined</code> on macOS,
+      <code>%APPDATA%\CCReimagined</code> on Windows. <b>Passwords are never written to disk</b>,
+      including any password inside a saved raw connection string, so the file is safe to sync
+      between machines.
+    </p>
+  </section>
+
+  <div class="foot">
+    CCReimagined · Developer Guide · generated from live PostgreSQL 18.6, MySQL 8.4, MariaDB 11.8,
+    SQL Server 15.0 and SQLite 3.53 instances.
+  </div>
+</div>
+
+</body>
+</html>
