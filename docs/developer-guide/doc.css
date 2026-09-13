@@ -1,4 +1,4 @@
-@page { size: A4; margin: 16mm 14mm 14mm 14mm; }
+@page { size: A4; margin: 15mm 14mm 12mm 14mm; }
 
 :root{
   --ink:#14181d; --muted:#5b6672; --line:#d8dee6; --rule:#b9c3ce;
@@ -42,6 +42,20 @@ h2,h3{page-break-after:avoid}
 
 figure{margin:0 0 10pt}
 figure img{width:100%;border:0.6pt solid var(--line);border-radius:2pt;display:block}
+
+/* A window in a screenshot, cropped without touching the source PNG.
+   --iw/--ih  natural size of the image
+   --sx/--sy  top-left of the region to keep, in source pixels
+   --cw/--ch  size of that region, in source pixels
+   Percentage margins resolve against the container's WIDTH — including margin-top —
+   which is what keeps the horizontal and vertical scale identical. */
+.crop{position:relative;width:100%;overflow:hidden;
+  aspect-ratio:var(--cw)/var(--ch);
+  border:0.6pt solid var(--line);border-radius:2pt;background:#0d1117}
+.crop img{display:block;border:0;border-radius:0;
+  width:calc(100% * var(--iw) / var(--cw));
+  margin-left:calc(-100% * var(--sx) / var(--cw));
+  margin-top:calc(-100% * var(--sy) / var(--cw))}
 figcaption{font-size:8.5pt;color:var(--muted);margin-top:4pt;line-height:1.4}
 
 table{width:100%;border-collapse:collapse;font-size:9pt;margin:0 0 10pt}
@@ -72,4 +86,4 @@ pre i{font-style:normal;color:var(--muted)}
   background:var(--accent);color:#fff;border-radius:50%;font-size:8pt;font-weight:700;
   display:flex;align-items:center;justify-content:center}
 
-.foot{margin-top:12pt;padding-top:6pt;border-top:0.6pt solid var(--line);font-size:8pt;color:var(--muted)}
+.provenance{margin-top:9pt;font-size:8.5pt;color:var(--muted);line-height:1.45}

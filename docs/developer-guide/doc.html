@@ -35,6 +35,10 @@
     <div><b>Replaces</b>TAICodeComplete<br>(WinForms, SQL Server only)</div>
     <div><b>Repository</b>Harlock123/CCReimagined<br>private</div>
   </div>
+  <p class="provenance">
+    Every screenshot and code excerpt in this guide was produced from live servers —
+    PostgreSQL 18.6, MySQL 8.4, MariaDB 11.8, SQL Server 15.0 and SQLite 3.53 — not written by hand.
+  </p>
 </div>
 
 <!-- ══════════════════════════════ WHAT / QUICK START ══════════════════════════════ -->
@@ -75,11 +79,13 @@
   <section>
     <h3>Connecting</h3>
     <figure>
-      <img src="images/shot-pg-schema.png" alt="CCReimagined connected to PostgreSQL showing the member table columns">
+      <div class="crop" style="--iw:2624;--ih:1648;--sx:24;--sy:56;--cw:2578;--ch:1345">
+        <img src="images/shot-pg-schema.png" alt="CCReimagined connected to PostgreSQL showing the member table columns">
+      </div>
       <figcaption>
         Connected to a live PostgreSQL 18 instance. The left rail lists databases, then tables and
-        views. The grid is the discovered schema for <code>public.member</code> — and the column
-        that matters most here is <b>C# type</b>, which is covered on the next page.
+        views; the grid is the discovered schema for <code>public.member</code>, all eleven columns.
+        The column that matters most is <b>C# type</b>, which is where the next page starts.
       </figcaption>
     </figure>
   </section>
@@ -255,11 +261,14 @@ VALUES (
   <section>
     <h2>The output</h2>
     <figure>
-      <img src="images/shot-pg-code.png" alt="The Generated C# tab showing a class generated for PostgreSQL">
+      <div class="crop" style="--iw:2624;--ih:1648;--sx:689;--sy:580;--cw:1883;--ch:950">
+        <img src="images/shot-pg-code.png" alt="The Generated C# tab showing a class generated for PostgreSQL">
+      </div>
       <figcaption>
-        The same table, generated for PostgreSQL: 504 lines, <code>using Npgsql</code>. The header
-        records the source relation, the target provider and the NuGet package the file needs, so a
-        class that turns up in a code review explains itself.
+        The same table, generated for PostgreSQL. The header records the source relation, the target
+        provider and the NuGet package the file needs, so a class that turns up in a code review
+        explains itself. The status bar reads
+        <i>“Generated Member.cs — 504 lines for PostgreSQL (Npgsql)”</i>.
       </figcaption>
     </figure>
 
@@ -272,11 +281,14 @@ VALUES (
   <section>
     <h3>Tables the old tool refused</h3>
     <figure>
-      <img src="images/shot-pg-assumedkey.png" alt="The tool generating for a table with a composite primary key">
+      <div class="crop" style="--iw:2624;--ih:1648;--sx:689;--sy:460;--cw:1883;--ch:415">
+        <img src="images/shot-pg-assumedkey.png" alt="The tool generating for a table with a composite primary key">
+      </div>
       <figcaption>
-        A composite-key table. There is no auto-numbering column, so the tool names the one it
-        assumed and carries on — the tick in the <b>Key</b> column is yours to move. The original
-        stopped at a modal dialog here.
+        A composite-key table: no auto-numbering column, so the tool assumes one, says which, and
+        carries on — <i>“no auto-numbering key column — 'member_id' was assumed. Pick another in the
+        Key column if that is wrong.”</i> The tick is yours to move. The original stopped at a modal
+        dialog here.
       </figcaption>
     </figure>
   </section>
@@ -349,10 +361,7 @@ docker compose --profile mssql up -d       <i># SQL Server (amd64 hosts)</i>
     </p>
   </section>
 
-  <div class="foot">
-    CCReimagined · Developer Guide · generated from live PostgreSQL 18.6, MySQL 8.4, MariaDB 11.8,
-    SQL Server 15.0 and SQLite 3.53 instances.
-  </div>
+
 </div>
 
 </body>
