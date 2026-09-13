@@ -29,7 +29,9 @@ public sealed class SqliteProvider : IDatabaseProvider
 
         var b = new SqliteConnectionStringBuilder
         {
-            DataSource = s.Database ?? "",
+            // A typed path may carry a ~ or a $HOME that no shell has expanded, and may be
+            // relative to wherever the app happens to have been launched from.
+            DataSource = FilePath.Resolve(s.Database),
             // Read-only would be safer, but the tool also offers to run generated DDL.
             Mode = SqliteOpenMode.ReadWrite,
         };
@@ -41,10 +43,29 @@ public sealed class SqliteProvider : IDatabaseProvider
     }
 
     public string WithDatabase(string connectionString, string database) =>
-        new SqliteConnectionStringBuilder(connectionString) { DataSource = database }.ConnectionString;
+        new SqliteConnectionStringBuilder(connectionString) { DataSource = FilePath.Resolve(database) }.ConnectionString;
 
     public async Task<ProbeResult> TestConnectionAsync(string cs, CancellationToken ct = default)
     {
+        // SQLite answers a missing file with "unable to open database file" and nothing else —
+        // no path, no reason. Checking first turns that into something actionable.
+        var source = new SqliteConnectionStringBuilder(cs).DataSource;
+
+        if (string.IsNullOrWhiteSpace(source))
+            return ProbeResult.Fail("No database file given. Enter the path to a SQLite file.");
+
+        if (Directory.Exists(source))
+            return ProbeResult.Fail($"'{source}' is a directory, not a SQLite database file.");
+
+        if (!File.Exists(source))
+        {
+            return ProbeResult.Fail(
+                $"No such file: {source}\n" +
+                "The path is resolved from where you typed it, so a leading ~ is expanded and a " +
+                "relative path is taken from the app's working directory. This tool opens an " +
+                "existing database rather than creating one.");
+        }
+
         try
         {
             await using var cn = new SqliteConnection(cs);
@@ -55,7 +76,7 @@ public sealed class SqliteProvider : IDatabaseProvider
         }
         catch (Exception ex)
         {
-            return ProbeResult.Fail(ex.Message);
+            return ProbeResult.Fail($"{ex.Message} (file: {source})");
         }
     }
 
