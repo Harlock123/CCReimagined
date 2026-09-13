@@ -142,3 +142,25 @@ The suite creates a real SQLite database, discovers it through the provider, gen
 **compiles that class with Roslyn**, and drives CRUD through it by reflection — so a generation
 change that produces code which does not build, or does not round-trip a row, fails the build.
 The view-model tests run the same connect → browse → select → generate sequence the window does.
+
+### Live-server tests
+
+Each engine emits a different class — a different ADO.NET client, a different DbType enum, and
+above all a different way of handing back a generated key (PostgreSQL returns it from the INSERT,
+MySQL fetches it with `LAST_INSERT_ID`). `LiveCrudTests` compiles the generated class and runs
+insert, key read-back, read, update, exists, list getters and delete against a real server, for
+PostgreSQL, MySQL and MariaDB.
+
+They need the sample servers from `dev/sample-databases`. When a server is not reachable the
+tests **skip** rather than fail, so a bare checkout with nothing running still goes green:
+
+```
+docker compose -f dev/sample-databases/docker-compose.yml up -d
+dotnet test
+```
+
+Point them elsewhere with a full connection string per engine:
+
+```
+CCR_TEST_POSTGRES=... CCR_TEST_MYSQL=... CCR_TEST_MARIADB=... dotnet test
+```
