@@ -73,8 +73,9 @@ pre i{font-style:normal;color:var(--muted)}
 
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:9pt}
 .grid2 pre{margin:0}
+.grid2 .span2{grid-column:1 / -1}
 .eng{font-size:8pt;font-weight:700;letter-spacing:.5pt;text-transform:uppercase;margin:0 0 3pt}
-.eng.pg{color:var(--pg)} .eng.my{color:var(--my)} .eng.ss{color:var(--ss)} .eng.lt{color:var(--lt)}
+.eng.pg{color:var(--pg)} .eng.my{color:var(--my)} .eng.ss{color:var(--ss)} .eng.lt{color:var(--lt)} .eng.or{color:#8a3ea8}
 
 .callout{background:var(--wash);border:0.6pt solid var(--line);border-radius:3pt;padding:8pt 10pt;margin:0 0 10pt}
 .callout p:last-child{margin-bottom:0}
