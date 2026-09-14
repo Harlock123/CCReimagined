@@ -27,6 +27,31 @@ The engine you browse and the engine the generated class targets are separate ch
 SQL Server database, pick "PostgreSQL (Npgsql)" on the **Generate** tab, and you get a class that
 talks to Postgres from the SQL Server schema — which is what porting a table between engines needs.
 
+## What it looks like
+
+![Connected to Oracle](docs/images/oracle-connected.png)
+
+*Connected to Oracle Database 26ai. The left rail says **Schemas** rather than Databases,
+because that is what Oracle lists — see [Oracle](#oracle) below. Nothing is auto-selected, and
+the relations are schema-qualified.*
+
+![The discovered schema](docs/images/oracle-schema.png)
+
+*The discovered schema for `CCR.MEMBER`. The **C# type** column is the provider's mapping of
+Oracle's types: `NUMBER(1)` to `bool`, `NUMBER(9)` to `int`, `NUMBER(12,2)` to `decimal`,
+`TIMESTAMP WITH TIME ZONE` to `DateTimeOffset`, `CLOB` to `string`, `RAW` to `byte[]`. The
+**Key** and **List param** ticks are the two choices you make before generating.*
+
+![A read-only view](docs/images/oracle-readonly-view.png)
+
+*An aggregating view. Oracle reports it as not updatable, so the summary says so and the
+generated class comes out without `Add`, `Update` and `Delete` — see [Views](#views).*
+
+![The generated class](docs/images/oracle-code.png)
+
+*512 lines for Oracle. The header records the source relation, the target provider and the
+NuGet package the file needs, so a generated class turns up in a review explaining itself.*
+
 ## Layout
 
 ```
@@ -105,6 +130,71 @@ each is asked in the way that is actually reliable:
 Unknown is treated generously: the mutating methods are still generated, and the uncertainty is
 recorded in the warnings rather than capability being removed silently. The **Generate** tab has a
 three-state tick to overrule the database in either direction.
+
+## Oracle
+
+Oracle is the only engine here where the connection fields do not mean what they do elsewhere,
+so it is worth reading once.
+
+**The Database field is a service name, not a schema.** On Oracle Database Free that is
+`FREEPDB1`. Get it wrong and you get ORA-50201, whose message — *"failed to connect to server or
+failed to parse connect string"* — blames the syntax of a connect string that is perfectly
+well-formed:
+
+```
+DATA SOURCE=localhost:1521/FREEPDB1   connects
+DATA SOURCE=localhost:1521/CCR        ORA-50201, because CCR is the schema
+```
+
+The tool adds its own explanation to that error rather than passing Oracle's wording along
+unhelped.
+
+**The left rail lists schemas, not databases.** Selecting one filters the relation list; it does
+not reconnect, because a schema is part of an object's name rather than somewhere to connect to.
+Nothing is selected for you, since the connected service is never one of the entries.
+
+**A generated key comes back through an output parameter.** Oracle has no `SCOPE_IDENTITY` and
+no `RETURNING` clause that yields a result set, so `AddAsync` binds an output parameter and reads
+it after the insert:
+
+```sql
+INSERT INTO "CCR"."MEMBER" ( ... ) VALUES ( :p_last_name, ... )
+RETURNING "MEMBER_ID" INTO :p_generated_key
+```
+
+**Identifiers fold to upper case unless they were quoted.** A table created as `member` is
+stored as `MEMBER`, and the generated properties follow the catalog. The tool resolves whichever
+spelling the catalog actually holds, preferring an exact match so a quoted mixed-case name is
+never confused with a differently-cased sibling.
+
+**There is one numeric type.** `NUMBER(1)` is the conventional boolean, `NUMBER(p,0)` is an
+integer whose width depends on `p`, and an unconstrained `NUMBER` exceeds every fixed CLR type,
+so it maps to `decimal`.
+
+| Oracle | C# |
+| --- | --- |
+| `NUMBER(1)` | `bool` |
+| `NUMBER(2..4,0)` | `short` |
+| `NUMBER(5..9,0)` | `int` |
+| `NUMBER(10..18,0)` | `long` |
+| `NUMBER`, `NUMBER(p,s)` | `decimal` |
+| `VARCHAR2`, `NVARCHAR2`, `CHAR`, `CLOB`, `NCLOB` | `string` |
+| `DATE`, `TIMESTAMP` | `DateTime` |
+| `TIMESTAMP WITH TIME ZONE` | `DateTimeOffset` |
+| `INTERVAL DAY TO SECOND` | `TimeSpan` |
+| `BLOB`, `RAW` | `byte[]` |
+| `BINARY_FLOAT` / `BINARY_DOUBLE` | `float` / `double` |
+
+To try it against the sample database:
+
+```
+cd dev/sample-databases
+docker compose --profile oracle up -d
+./seed-oracle.sh
+```
+
+Then connect with server `localhost`, port `1521`, database `FREEPDB1`, user `ccr`, password
+`ccr_dev_password`, and **Integrated security unticked**.
 
 ## Saved connections
 
