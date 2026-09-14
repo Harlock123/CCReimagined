@@ -188,7 +188,7 @@
             <!-- left: databases and relations -->
             <Border Grid.Column="0" Classes="panel">
                 <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*">
-                    <TextBlock Grid.Row="0" Classes="section" Text="Databases" />
+                    <TextBlock Grid.Row="0" Classes="section" Text="{Binding DatabaseListLabel}" />
 
                     <ListBox Grid.Row="1"
                              MaxHeight="150"

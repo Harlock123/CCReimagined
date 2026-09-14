@@ -16,8 +16,11 @@ public sealed class OracleProvider : IDatabaseProvider
         // Operating-system authentication exists but needs the client configured for it, which
         // is not something the tool can arrange, so credentials are always asked for.
         SupportsIntegratedAuth = false,
-        // Oracle's unit of separation is the schema, not the database. The picker lists schemas.
+        // Oracle's unit of separation is the schema, not the database, and the two live in
+        // different namespaces: the connection string names a service, the picker names a
+        // schema inside it. Selecting one must filter, never reconnect.
         SupportsDatabaseEnumeration = true,
+        DatabaseListKind = DatabaseListKind.Schema,
         SupportsSchemas = true,
         DefaultPort = 1521,
     };
@@ -45,18 +48,17 @@ public sealed class OracleProvider : IDatabaseProvider
     }
 
     /// <summary>
-    /// Repoints at a different service. Switching schema is a separate matter — the relation
-    /// list is schema-qualified, so nothing needs to change on the connection for that.
+    /// Returns the connection string unchanged.
+    ///
+    /// The entries this provider lists are schemas, and a schema is not something you connect
+    /// to — it is part of the object name. Writing one into the service-name slot produces
+    /// ORA-50201, which reads "failed to connect to server or failed to parse connect string"
+    /// and sends you looking for a syntax error that is not there.
+    ///
+    /// Use <see cref="BuildConnectionString"/> with a different service to reach another
+    /// database.
     /// </summary>
-    public string WithDatabase(string connectionString, string database)
-    {
-        var b = new OracleConnectionStringBuilder(connectionString);
-        var source = b.DataSource ?? "";
-        var slash = source.LastIndexOf('/');
-
-        b.DataSource = slash >= 0 ? source[..(slash + 1)] + database : $"{source}/{database}";
-        return b.ConnectionString;
-    }
+    public string WithDatabase(string connectionString, string database) => connectionString;
 
     public async Task<ProbeResult> TestConnectionAsync(string cs, CancellationToken ct = default)
     {
@@ -73,8 +75,48 @@ public sealed class OracleProvider : IDatabaseProvider
         }
         catch (Exception ex)
         {
-            return ProbeResult.Fail(ex.Message);
+            return ProbeResult.Fail(Explain(ex, cs));
         }
+    }
+
+    /// <summary>
+    /// Oracle's ORA-50201 reads "failed to connect to server or failed to parse connect string"
+    /// for two unrelated faults, and the usual cause is the second half of the data source: the
+    /// bit after the slash is a service name, and a schema put there looks exactly like a
+    /// syntax error that is not one.
+    /// </summary>
+    private static string Explain(Exception ex, string cs)
+    {
+        var message = ex.Message;
+
+        if (!message.Contains("ORA-50201", StringComparison.Ordinal)
+            && !message.Contains("ORA-12514", StringComparison.Ordinal))
+        {
+            return message;
+        }
+
+        var source = "";
+
+        try
+        {
+            source = new OracleConnectionStringBuilder(cs).DataSource ?? "";
+        }
+        catch (ArgumentException)
+        {
+            // Genuinely unparseable, so the original message stands on its own.
+            return message;
+        }
+
+        var slash = source.LastIndexOf('/');
+        var service = slash >= 0 ? source[(slash + 1)..] : "";
+
+        return message + "\n\n"
+            + (service.Length > 0
+                ? $"The data source names '{service}' after the slash. That is a service name, "
+                  + "not a schema or a user — on Oracle Database Free it is usually FREEPDB1. "
+                  + "Pick the schema from the list once connected."
+                : "The data source has no service name after the slash, e.g. "
+                  + "localhost:1521/FREEPDB1.");
     }
 
     /// <summary>

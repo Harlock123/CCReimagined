@@ -23,8 +23,17 @@ docker compose --profile oracle up -d
 ```
 
 Oracle's **Database** field is a *service name*, not a schema — `FREEPDB1` on the Free edition.
-The schema picker fills with schemas once connected, which is the level a developer chooses
-between.
+It is the only engine here where those differ, and getting it wrong produces ORA-50201, whose
+message blames the syntax of the connect string rather than the name in it:
+
+```
+DATA SOURCE=localhost:1521/FREEPDB1   connects
+DATA SOURCE=localhost:1521/CCR        ORA-50201 — CCR is the schema, not the service
+```
+
+Once connected, the left rail lists **Schemas** rather than Databases. Selecting one filters the
+relation list; it does not reconnect, because a schema is part of an object's name and not
+somewhere to connect to.
 
 ## Connection details
 

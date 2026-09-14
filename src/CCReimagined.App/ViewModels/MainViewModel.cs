@@ -266,6 +266,9 @@ public partial class MainViewModel : ViewModelBase
 
     public string DatabaseLabel => DatabaseIsFilePath ? "Database file" : "Database";
 
+    /// <summary>"Databases" for most engines, "Schemas" for Oracle.</summary>
+    public string DatabaseListLabel => SelectedProvider.Capabilities.DatabaseListLabel;
+
     /// <summary>
     /// True everywhere except macOS, where the menu belongs in the system bar at the top of the
     /// screen rather than inside the window. The window carries both and shows the right one.
@@ -309,13 +312,25 @@ public partial class MainViewModel : ViewModelBase
                 foreach (var db in await provider.ListDatabasesAsync(connectionString, ct))
                     Databases.Add(db);
 
-                // Land on the catalog the connection string already names, when it is listed.
                 var current = settings.Database;
-                SelectedDatabase = Databases.FirstOrDefault(d =>
-                                       string.Equals(d, current, StringComparison.OrdinalIgnoreCase))
-                                   ?? Databases.FirstOrDefault();
+                var match = Databases.FirstOrDefault(d =>
+                    string.Equals(d, current, StringComparison.OrdinalIgnoreCase));
 
-                Report($"{probe.ServerVersion} — {Databases.Count} database(s).");
+                if (provider.Capabilities.DatabaseListKind == DatabaseListKind.Schema)
+                {
+                    // These are schemas inside the connection, not catalogs to reconnect to.
+                    // The relations are already loaded and schema-qualified; selecting one
+                    // filters them. Nothing is auto-selected, because the connected service is
+                    // not one of these entries and picking an arbitrary one would be a guess.
+                    await LoadRelationsAsync(connectionString, ct);
+                    Report($"{probe.ServerVersion} — {Databases.Count} schema(s), {_allRelations.Count} relation(s).");
+                }
+                else
+                {
+                    // Land on the catalog the connection string already names, when it is listed.
+                    SelectedDatabase = match ?? Databases.FirstOrDefault();
+                    Report($"{probe.ServerVersion} — {Databases.Count} database(s).");
+                }
             }
             else
             {
@@ -651,6 +666,16 @@ public partial class MainViewModel : ViewModelBase
             return;
 
         var provider = SelectedProvider;
+
+        if (provider.Capabilities.DatabaseListKind == DatabaseListKind.Schema)
+        {
+            // A schema is part of an object's name, not somewhere to connect. Writing one into
+            // the connection string breaks it — on Oracle with an error that blames the syntax.
+            ApplyRelationFilter();
+            Report($"{value}: {Relations.Count} of {_allRelations.Count} relation(s).");
+            return;
+        }
+
         var connectionString = provider.WithDatabase(EffectiveConnectionString, value);
         EffectiveConnectionString = connectionString;
 
@@ -762,8 +787,20 @@ public partial class MainViewModel : ViewModelBase
 
         Relations.Clear();
 
+        // For a schema-listing engine the selected entry narrows the list; for the others the
+        // relations already belong to the connected catalog, so only the text box applies.
+        var schema = SelectedProvider.Capabilities.DatabaseListKind == DatabaseListKind.Schema
+            ? SelectedDatabase
+            : null;
+
         foreach (var row in _allRelations)
         {
+            if (schema is not null &&
+                !string.Equals(row.Relation.Schema, schema, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             if (filter.Length == 0 || row.Display.Contains(filter, StringComparison.OrdinalIgnoreCase))
                 Relations.Add(row);
         }
@@ -801,6 +838,7 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(SupportsDatabaseEnumeration));
         OnPropertyChanged(nameof(NeedsCredentials));
         OnPropertyChanged(nameof(DatabaseLabel));
+        OnPropertyChanged(nameof(DatabaseListLabel));
     }
 
     private string DescribeSource()

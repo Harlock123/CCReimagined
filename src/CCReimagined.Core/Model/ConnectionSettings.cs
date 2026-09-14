@@ -41,6 +41,21 @@ public sealed record ConnectionSettings
     public bool UsesRaw => !string.IsNullOrWhiteSpace(RawConnectionString);
 }
 
+/// <summary>
+/// What the list beside the relation picker actually contains, because the engines do not
+/// agree. For most, an entry is a catalog you reconnect to. For Oracle it is a schema inside
+/// the database you are already connected to — selecting one narrows the relation list and
+/// must not touch the connection string, whose service name is a different thing entirely.
+/// </summary>
+public enum DatabaseListKind
+{
+    /// <summary>Entries are catalogs. Selecting one reconnects to it.</summary>
+    Catalog,
+
+    /// <summary>Entries are schemas within the current connection. Selecting one filters.</summary>
+    Schema,
+}
+
 /// <summary>What a provider needs from the user, so the UI can enable only the relevant fields.</summary>
 public sealed record ProviderCapabilities
 {
@@ -59,6 +74,12 @@ public sealed record ProviderCapabilities
 
     /// <summary>File-extension filter for providers whose "database" is a file.</summary>
     public bool DatabaseIsFilePath { get; init; }
+
+    /// <summary>Whether the browsable list holds catalogs or schemas.</summary>
+    public DatabaseListKind DatabaseListKind { get; init; } = DatabaseListKind.Catalog;
+
+    /// <summary>What to call that list in the UI.</summary>
+    public string DatabaseListLabel => DatabaseListKind == DatabaseListKind.Schema ? "Schemas" : "Databases";
 }
 
 public sealed record ProbeResult(bool Success, string? ServerVersion, string? Error)
