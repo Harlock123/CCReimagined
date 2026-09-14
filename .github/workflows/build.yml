@@ -39,6 +39,97 @@ jobs:
       - name: Run the suite
         run: dotnet test --configuration Release --logger 'console;verbosity=normal'
 
+  # The live tests skip themselves without a database, so on a bare runner the most valuable
+  # coverage never runs. Service containers give them real servers. This job is additive: the
+  # build does not wait on it, so a slow Oracle pull never holds up an artifact.
+  #
+  # SQL Server is the real amd64 image here. It cannot run on an arm64 development machine —
+  # sqlservr segfaults under qemu — so CI actually covers more than a local run does.
+  live:
+    name: live databases
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: ccr
+          POSTGRES_PASSWORD: ccr_dev_password
+          POSTGRES_DB: ccrsample
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ccr -d ccrsample"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ccr_dev_password
+          MYSQL_DATABASE: ccrsample
+          MYSQL_USER: ccr
+          MYSQL_PASSWORD: ccr_dev_password
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uccr -pccr_dev_password"
+          --health-interval 5s --health-timeout 5s --health-retries 30
+
+      mariadb:
+        image: mariadb:11.8
+        env:
+          MARIADB_ROOT_PASSWORD: ccr_dev_password
+          MARIADB_DATABASE: ccrsample
+          MARIADB_USER: ccr
+          MARIADB_PASSWORD: ccr_dev_password
+        ports: ['3307:3306']
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s --health-timeout 5s --health-retries 30
+
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: 'Y'
+          MSSQL_SA_PASSWORD: ccr_Dev_Password1
+          MSSQL_PID: Developer
+        ports: ['1433:1433']
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P ccr_Dev_Password1 -C -Q 'SELECT 1' -b"
+          --health-interval 10s --health-timeout 10s --health-retries 30 --health-start-period 60s
+
+      # The database is baked into the image, so this is ready in seconds rather than
+      # building itself on first boot. It is the reason the image is over two gigabytes.
+      oracle:
+        image: gvenzl/oracle-free:23-slim
+        env:
+          ORACLE_PASSWORD: ccr_Dev_Password1
+          APP_USER: ccr
+          APP_USER_PASSWORD: ccr_dev_password
+        ports: ['1521:1521']
+        options: >-
+          --health-cmd healthcheck.sh
+          --health-interval 15s --health-timeout 10s --health-retries 40 --health-start-period 60s
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run the suite against all five engines
+        run: dotnet test --configuration Release --logger 'console;verbosity=normal'
+
+      # A skip here means a server did not come up, which would quietly hollow out the run.
+      - name: Fail if anything skipped
+        run: |
+          dotnet test --configuration Release --logger 'trx;LogFileName=results.trx' > /dev/null 2>&1 || true
+          skipped=$(grep -o 'outcome="NotExecuted"' TestResults/results.trx 2>/dev/null | wc -l)
+          echo "skipped: $skipped"
+          if [[ "$skipped" != "0" ]]; then
+            echo "::error::$skipped test(s) skipped — a database service did not start"
+            exit 1
+          fi
+
   single-file:
     name: single file
     needs: test
