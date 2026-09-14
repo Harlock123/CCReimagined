@@ -11,6 +11,13 @@ public enum IdentityStrategy
     /// <summary>A scalar appended to the INSERT batch (SCOPE_IDENTITY, LAST_INSERT_ID, last_insert_rowid).</summary>
     AppendedSelect,
 
+    /// <summary>
+    /// The INSERT writes the key into an output parameter — Oracle's
+    /// <c>RETURNING id INTO :p_out</c>. Neither a second statement nor a result set, so the
+    /// generated Add binds an extra parameter and reads its value afterwards.
+    /// </summary>
+    ReturningIntoParameter,
+
     /// <summary>No generated key to fetch.</summary>
     None,
 }
@@ -70,6 +77,12 @@ public interface ICodegenProfile
 
     /// <summary>Row-limiting clause for the list getters, given a positive row count.</summary>
     string LimitClause(int rows);
+
+    /// <summary>
+    /// The name of the output parameter an <see cref="IdentityStrategy.ReturningIntoParameter"/>
+    /// insert writes the new key into. Ignored by the other strategies.
+    /// </summary>
+    string IdentityOutputParameterName => ParameterPrefix + "p_generated_key";
 
     /// <summary>True when the limit goes after the SELECT keyword (SQL Server's TOP) rather than at the end.</summary>
     bool LimitIsPrefix { get; }

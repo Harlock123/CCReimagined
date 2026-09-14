@@ -110,8 +110,13 @@ public sealed class SqlBuilder
 
         return _profile.IdentityStrategy switch
         {
-            IdentityStrategy.ReturningClause => body + "\n" + _profile.IdentityRetrievalSql(_table, key),
+            // Part of the same statement.
+            IdentityStrategy.ReturningClause or IdentityStrategy.ReturningIntoParameter =>
+                body + "\n" + _profile.IdentityRetrievalSql(_table, key),
+
+            // A second statement in the same batch.
             IdentityStrategy.AppendedSelect => body + ";\n" + _profile.IdentityRetrievalSql(_table, key),
+
             _ => body,
         };
     }

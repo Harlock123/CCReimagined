@@ -152,12 +152,40 @@ public static class LiveServers
         return provider.WithDatabase(masterConnectionString, SqlServerTestDatabase);
     }
 
+    public static LiveTarget Oracle { get; } = new(
+        "Oracle",
+        "oracle",
+        "CCR_TEST_ORACLE",
+        table => $"""
+            CREATE TABLE {table} (
+                id        NUMBER(9) GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                name      VARCHAR2(40) NOT NULL,
+                nickname  VARCHAR2(40),
+                balance   NUMBER(12,2) NOT NULL,
+                is_active NUMBER(1) NOT NULL,
+                joined    DATE,
+                payload   BLOB
+            )
+            """,
+        new ConnectionSettings
+        {
+            Host = "localhost",
+            Port = 1521,
+            // The service name, not a schema.
+            Database = "FREEPDB1",
+            AuthMode = AuthMode.UserPassword,
+            UserName = "ccr",
+            Password = "ccr_dev_password",
+            ConnectTimeoutSeconds = 10,
+        });
+
     public static IEnumerable<object[]> All()
     {
         yield return [PostgreSql];
         yield return [MySql];
         yield return [MariaDb];
         yield return [SqlServer];
+        yield return [Oracle];
     }
 
     /// <summary>

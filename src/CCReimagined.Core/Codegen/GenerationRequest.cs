@@ -100,5 +100,8 @@ public sealed record GenerationRequest
 
     public ColumnInfo? EffectiveKeyColumn => KeyColumnName is null
         ? Schema.KeyColumn
-        : Schema.Columns.FirstOrDefault(c => c.Name == KeyColumnName) ?? Schema.KeyColumn;
+        : Schema.Columns.FirstOrDefault(c => c.Name == KeyColumnName)
+          ?? Schema.Columns.FirstOrDefault(c =>
+                 string.Equals(c.Name, KeyColumnName, StringComparison.OrdinalIgnoreCase))
+          ?? Schema.KeyColumn;
 }

@@ -5,6 +5,7 @@ using CCReimagined.Core.Model;
 using Microsoft.Data.SqlClient;
 using MySqlConnector;
 using Npgsql;
+using Oracle.ManagedDataAccess.Client;
 
 namespace CCReimagined.Core.Tests;
 
@@ -21,7 +22,7 @@ namespace CCReimagined.Core.Tests;
 public sealed class LiveCrudTests
 {
     private static readonly Type[] ProviderTypes =
-        [typeof(NpgsqlConnection), typeof(MySqlConnection), typeof(SqlConnection)];
+        [typeof(NpgsqlConnection), typeof(MySqlConnection), typeof(SqlConnection), typeof(OracleConnection)];
 
     [SkippableTheory]
     [MemberData(nameof(LiveServers.All), MemberType = typeof(LiveServers))]
@@ -83,7 +84,7 @@ public sealed class LiveCrudTests
             Assert.Equal("Watson", Get(reloaded, "name"));
             Assert.Equal(125.50m, Get(reloaded, "balance"));
             Assert.Equal(true, Get(reloaded, "is_active"));
-            Assert.Equal(new DateOnly(2026, 1, 15), Get(reloaded, "joined"));
+            AssertSame(new DateOnly(2026, 1, 15), Get(reloaded, "joined"));
             Assert.Equal(new byte[] { 1, 2, 3 }, Get(reloaded, "payload"));
             // A nullable column has to come back as null, not as an empty sentinel.
             Assert.Null(Get(reloaded, "nickname"));
@@ -189,6 +190,7 @@ public sealed class LiveCrudTests
             "postgresql" => new NpgsqlConnection(connectionString),
             "mysql" => new MySqlConnection(connectionString),
             "sqlserver" => new SqlConnection(connectionString),
+            "oracle" => new OracleConnection(connectionString),
             _ => throw new NotSupportedException($"No live harness for provider '{provider.Id}'."),
         };
 
@@ -205,17 +207,62 @@ public sealed class LiveCrudTests
     private static Type KeyClrType(Type generated) =>
         generated.GetMethod("ReadAsync")!.GetParameters()[0].ParameterType;
 
-    private static void Set(object instance, string property, object? value) =>
-        instance.GetType().GetProperty(property)!.SetValue(instance, value);
+    /// <summary>
+    /// Oracle folds an unquoted identifier to upper case, so a column written as "name" comes
+    /// back as NAME and the generated property is named accordingly. Members are therefore
+    /// matched without regard to case, and values converted to whatever the property expects —
+    /// an Oracle DATE maps to DateTime where the others give DateOnly.
+    /// </summary>
+    private static PropertyInfo Property(object instance, string name) =>
+        instance.GetType().GetProperty(name, BindingFlags.Public | BindingFlags.Instance
+            | BindingFlags.IgnoreCase)
+        ?? throw new MissingMemberException(instance.GetType().Name, name);
+
+    private static void Set(object instance, string property, object? value)
+    {
+        var info = Property(instance, property);
+        Property(instance, property).SetValue(instance, Coerce(value, info.PropertyType));
+    }
 
     private static object? Get(object instance, string property) =>
-        instance.GetType().GetProperty(property)!.GetValue(instance);
+        Property(instance, property).GetValue(instance);
+
+    private static object? Coerce(object? value, Type target)
+    {
+        if (value is null)
+            return null;
+
+        var bare = Nullable.GetUnderlyingType(target) ?? target;
+
+        if (bare.IsInstanceOfType(value))
+            return value;
+
+        return (value, bare) switch
+        {
+            (DateOnly d, _) when bare == typeof(DateTime) => d.ToDateTime(TimeOnly.MinValue),
+            (DateTime d, _) when bare == typeof(DateOnly) => DateOnly.FromDateTime(d),
+            _ => Convert.ChangeType(value, bare),
+        };
+    }
+
+    /// <summary>Compares a read-back value against what was written, across the date shapes.</summary>
+    private static void AssertSame(object? expected, object? actual)
+    {
+        if (expected is DateOnly d && actual is DateTime dt)
+        {
+            Assert.Equal(d, DateOnly.FromDateTime(dt));
+            return;
+        }
+
+        Assert.Equal(expected, actual);
+    }
 
     private static async Task<T> Invoke<T>(object instance, string method, params object?[] args)
     {
         var info = instance.GetType()
             .GetMethods(BindingFlags.Public | BindingFlags.Instance)
-            .First(m => m.Name == method && m.GetParameters().Length == args.Length + 1);
+            .First(m => string.Equals(m.Name, method, StringComparison.OrdinalIgnoreCase)
+                        && m.GetParameters().Length == args.Length + 1);
 
         var task = info.Invoke(instance, args.Append((object?)CancellationToken.None).ToArray())!;
         await (Task)task;
@@ -231,7 +278,8 @@ public sealed class LiveCrudTests
     {
         var info = type
             .GetMethods(BindingFlags.Public | BindingFlags.Static)
-            .First(m => m.Name == method && m.GetParameters().Length == args.Length + 1);
+            .First(m => string.Equals(m.Name, method, StringComparison.OrdinalIgnoreCase)
+                        && m.GetParameters().Length == args.Length + 1);
 
         var task = (Task)info.Invoke(null, args.Append((object?)CancellationToken.None).ToArray())!;
         await task;

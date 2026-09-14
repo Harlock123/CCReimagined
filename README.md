@@ -21,6 +21,7 @@ Studio integration, the subnet scanner) are deliberately not carried over yet.
 | PostgreSQL | `information_schema`, `pg_database` | `Npgsql` |
 | MySQL / MariaDB | `information_schema` | `MySqlConnector` |
 | SQLite | `sqlite_master`, `PRAGMA table_xinfo` | `Microsoft.Data.Sqlite` |
+| Oracle | `all_tab_cols`, `all_tab_identity_cols` | `Oracle.ManagedDataAccess.Core` |
 
 The engine you browse and the engine the generated class targets are separate choices. Browse a
 SQL Server database, pick "PostgreSQL (Npgsql)" on the **Generate** tab, and you get a class that
@@ -46,8 +47,9 @@ The two seams that matter:
   the parameter sigil, the DbType enum, identifier quoting, and how a generated key comes back
   after an INSERT. The generator is written once against this interface.
 
-Adding an engine — Oracle being the obvious next one — means writing one of each. No change to the
-generator, and no change to the UI.
+Adding an engine means writing one of each. No change to the generator, and no change to the UI —
+Oracle was added that way, the only generator change being a third identity strategy, because
+Oracle returns a generated key through an output bind variable rather than a result set.
 
 ## What it generates
 
@@ -97,6 +99,7 @@ each is asked in the way that is actually reliable:
 | PostgreSQL | `information_schema.views.is_updatable`, plus `is_trigger_updatable` for an INSTEAD OF trigger |
 | MySQL / MariaDB | `information_schema.views.is_updatable` |
 | SQLite | Read-only unless an INSTEAD OF trigger exists — SQLite refuses writes through a view outright |
+| Oracle | `all_updatable_columns`, which is per column and reliable |
 | SQL Server | `IS_UPDATABLE` exists but reports `NO` for views that accept an `UPDATE`, so it is not read. An INSTEAD OF trigger proves updatability; otherwise the answer is *unknown* |
 
 Unknown is treated generously: the mutating methods are still generated, and the uncertainty is

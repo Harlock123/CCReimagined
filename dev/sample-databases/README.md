@@ -16,7 +16,15 @@ docker compose up -d
 # SQL Server — pick one of these, see the caveat below
 docker compose --profile mssql up -d        # real SQL Server, amd64 hosts
 docker compose --profile mssql-arm up -d    # Azure SQL Edge, arm64 hosts
+
+# Oracle — native arm64, but a heavy image and a slow first start
+docker compose --profile oracle up -d
+./seed-oracle.sh
 ```
+
+Oracle's **Database** field is a *service name*, not a schema — `FREEPDB1` on the Free edition.
+The schema picker fills with schemas once connected, which is the level a developer chooses
+between.
 
 ## Connection details
 

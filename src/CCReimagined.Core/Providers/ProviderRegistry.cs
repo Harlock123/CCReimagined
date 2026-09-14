@@ -9,6 +9,7 @@ public static class ProviderRegistry
         new PostgreSqlProvider(),
         new MySqlProvider(),
         new SqliteProvider(),
+        new OracleProvider(),
     ];
 
     public static IDatabaseProvider ById(string id) =>

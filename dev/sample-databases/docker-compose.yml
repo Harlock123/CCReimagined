@@ -156,9 +156,36 @@ services:
     profiles:
       - mssql-arm
 
+  # Oracle Database Free. Native arm64, unlike SQL Server, but a heavy image and a slow
+  # first start while it builds the database - hence a profile of its own.
+  #
+  #   docker compose --profile oracle up -d
+  #   ./seed-oracle.sh
+  #
+  oracle:
+    image: gvenzl/oracle-free:23-slim
+    container_name: ccr-oracle
+    environment:
+      ORACLE_PASSWORD: ccr_Dev_Password1
+      APP_USER: ccr
+      APP_USER_PASSWORD: ccr_dev_password
+    ports:
+      - "1521:1521"
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 180s
+    profiles:
+      - oracle
+
 volumes:
   postgres-data:
   mysql-data:
   mariadb-data:
   sqlserver-data:
   sqlserver-arm-data:
+  oracle-data:

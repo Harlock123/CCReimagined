@@ -51,8 +51,13 @@ internal sealed class EmitContext
             _fields[col.Name] = Naming.ToFieldName(candidate);
         }
 
+        // Matched without regard to case: a caller naming "name" should find the column even
+        // where the engine stores it as NAME, which is what Oracle does with any identifier
+        // that was not quoted when the table was created.
         ListFilterColumns = request.ListParameterColumns
-            .Select(name => columns.FirstOrDefault(c => c.Name == name))
+            .Select(name => columns.FirstOrDefault(c => c.Name == name)
+                            ?? columns.FirstOrDefault(c =>
+                                   string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase)))
             .Where(c => c is not null)
             .Select(c => c!)
             .DistinctBy(c => c.Name)

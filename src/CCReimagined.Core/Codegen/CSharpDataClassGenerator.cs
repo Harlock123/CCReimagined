@@ -539,7 +539,23 @@ public sealed class CSharpDataClassGenerator
 
             w.Blank();
 
-            if (fetchesKey)
+            if (fetchesKey && c.Profile.IdentityStrategy == IdentityStrategy.ReturningIntoParameter)
+            {
+                // Oracle writes the new key into a bind variable rather than returning it, so
+                // the parameter is added before the insert and read back afterwards.
+                var name = Naming.ToCSharpLiteral(c.Profile.IdentityOutputParameterName);
+                var dbType = $"{c.Profile.DbTypeEnumName}.{c.Profile.DbTypeMember(c.Key!)}";
+
+                w.Line($"var generatedKey = command.Parameters.Add({name}, {dbType});");
+                w.Line("generatedKey.Direction = System.Data.ParameterDirection.Output;");
+                w.Blank();
+                w.Line("await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);");
+                w.Blank();
+
+                using (w.Open("if (generatedKey.Value is { } returned && returned is not DBNull)"))
+                    w.Line($"{c.FieldOf(c.Key!)} = {c.ConvertScalar(c.Key!, "returned.ToString()!")};");
+            }
+            else if (fetchesKey)
             {
                 w.Line("var scalar = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);");
                 w.Blank();
