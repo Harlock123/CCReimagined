@@ -392,6 +392,7 @@
                         </StackPanel>
 
                         <sc:SyntaxHighlightingTextBox Grid.Row="1"
+                                                      x:Name="GeneratedCodeEditor"
                                                       Text="{Binding GeneratedCode}"
                                                       Language="CSharp"
                                                       SyntaxTheme="{Binding SelectedEditorTheme.Theme}"
