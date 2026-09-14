@@ -167,7 +167,31 @@ public sealed class SqliteProvider : IDatabaseProvider
             Table = table,
             Columns = columns,
             KeyColumn = TableSchema.ResolveKeyColumn(columns, table.Name),
+            Mutability = table.Kind == RelationKind.View
+                ? await ViewMutabilityAsync(cn, table.Name, ct)
+                : ViewMutability.NotApplicable,
         };
+    }
+
+    /// <summary>
+    /// SQLite refuses writes through a view outright — "cannot modify X because it is a view"
+    /// — so a view is read-only unless an INSTEAD OF trigger stands in for the write.
+    /// </summary>
+    private static async Task<ViewMutability> ViewMutabilityAsync(
+        SqliteConnection cn, string view, CancellationToken ct)
+    {
+        const string sql = """
+            SELECT COUNT(*)
+            FROM sqlite_master
+            WHERE type = 'trigger'
+              AND tbl_name = @view
+              AND UPPER(COALESCE(sql, '')) LIKE '%INSTEAD OF%'
+            """;
+
+        await using var cmd = AdoHelpers.Command(cn, sql, ("@view", view));
+        var triggers = Convert.ToInt32(await cmd.ExecuteScalarAsync(ct) ?? 0);
+
+        return triggers > 0 ? ViewMutability.Updatable : ViewMutability.ReadOnly;
     }
 
     private static async Task<bool> IsWithoutRowIdAsync(SqliteConnection cn, string table, CancellationToken ct)

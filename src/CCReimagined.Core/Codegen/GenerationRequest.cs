@@ -46,6 +46,16 @@ public sealed record GenerationOptions
 
     /// <summary>Include a header comment recording what generated the file and from where.</summary>
     public bool IncludeProvenanceHeader { get; init; } = true;
+
+    /// <summary>
+    /// Whether a view gets Add, Update and Delete.
+    ///
+    /// <c>null</c>, the default, follows the database: a view the engine reports as read-only
+    /// generates without them, and one it reports as updatable — or will not vouch for either
+    /// way — gets them. Set it explicitly to overrule that, for a view the engine misjudges or
+    /// one you would rather keep read-only regardless.
+    /// </summary>
+    public bool? MutatingMethodsForViews { get; init; }
 }
 
 /// <summary>

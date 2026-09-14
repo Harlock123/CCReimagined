@@ -83,6 +83,25 @@ The shape is deliberately familiar, but some behaviours were fixed rather than c
   not every provider ships a `DataAdapter`.
 - **Parameters carry their declared size** for bounded text and binary columns, so the server reuses
   one cached plan instead of one per value length.
+- **A read-only view generates a read-only class.** The original emitted `Add`, `Update` and
+  `Delete` for any view and left you to find out at runtime.
+
+### Views
+
+A class generated from a view only gets `Add`, `Update` and `Delete` when the database allows
+writes through it. The engines differ in how they answer, and one of them answers wrongly, so
+each is asked in the way that is actually reliable:
+
+| Engine | How it is determined |
+| --- | --- |
+| PostgreSQL | `information_schema.views.is_updatable`, plus `is_trigger_updatable` for an INSTEAD OF trigger |
+| MySQL / MariaDB | `information_schema.views.is_updatable` |
+| SQLite | Read-only unless an INSTEAD OF trigger exists — SQLite refuses writes through a view outright |
+| SQL Server | `IS_UPDATABLE` exists but reports `NO` for views that accept an `UPDATE`, so it is not read. An INSTEAD OF trigger proves updatability; otherwise the answer is *unknown* |
+
+Unknown is treated generously: the mutating methods are still generated, and the uncertainty is
+recorded in the warnings rather than capability being removed silently. The **Generate** tab has a
+three-state tick to overrule the database in either direction.
 
 ## Saved connections
 

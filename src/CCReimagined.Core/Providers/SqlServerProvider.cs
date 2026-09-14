@@ -186,8 +186,36 @@ public sealed class SqlServerProvider : IDatabaseProvider
             Table = table,
             Columns = columns,
             KeyColumn = TableSchema.ResolveKeyColumn(columns, table.Name),
+            Mutability = table.Kind == RelationKind.View
+                ? await ViewMutabilityAsync(cs, table, ct)
+                : ViewMutability.NotApplicable,
         };
     }
+
+    /// <summary>
+    /// SQL Server has INFORMATION_SCHEMA.VIEWS.IS_UPDATABLE, and it is not worth reading: it
+    /// reports NO for views that accept an UPDATE perfectly well. An INSTEAD OF trigger is
+    /// proof of updatability; without one the honest answer is that we do not know, so the
+    /// mutating methods are still generated and the doubt is recorded in the file.
+    /// </summary>
+    private static async Task<ViewMutability> ViewMutabilityAsync(
+        string cs, TableRef table, CancellationToken ct)
+    {
+        const string sql = """
+            SELECT COUNT(*)
+            FROM sys.triggers
+            WHERE parent_id = OBJECT_ID(@relation) AND is_instead_of_trigger = 1
+            """;
+
+        // A second connection: the column reader still owns the first.
+        await using var cn = new SqlConnection(cs);
+        await cn.OpenAsync(ct);
+        await using var cmd = AdoHelpers.Command(cn, sql, ("@relation", table.QualifiedName));
+        var triggers = Convert.ToInt32(await cmd.ExecuteScalarAsync(ct) ?? 0);
+
+        return triggers > 0 ? ViewMutability.Updatable : ViewMutability.Unknown;
+    }
+
 
     internal static ClrTypeKind MapType(string native) => native.ToLowerInvariant() switch
     {

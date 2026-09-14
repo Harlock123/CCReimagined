@@ -91,6 +91,9 @@ internal sealed class EmitContext
 
     internal bool NeedsEmptyStringHelper { get; }
 
+    /// <summary>False for a read-only view, where Add, Update and Delete are left out.</summary>
+    internal bool EmitMutatingMethods { get; init; } = true;
+
     internal string PropOf(ColumnInfo column) => _properties[column.Name];
 
     internal string FieldOf(ColumnInfo column) => _fields[column.Name];

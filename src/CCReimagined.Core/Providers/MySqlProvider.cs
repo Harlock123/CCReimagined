@@ -166,8 +166,36 @@ public sealed class MySqlProvider : IDatabaseProvider
             Table = table,
             Columns = columns,
             KeyColumn = TableSchema.ResolveKeyColumn(columns, table.Name),
+            Mutability = table.Kind == RelationKind.View
+                ? await ViewMutabilityAsync(cs, table, ct)
+                : ViewMutability.NotApplicable,
         };
     }
+
+    /// <summary>MySQL and MariaDB both report this accurately.</summary>
+    private static async Task<ViewMutability> ViewMutabilityAsync(
+        string cs, TableRef table, CancellationToken ct)
+    {
+        const string sql = """
+            SELECT is_updatable
+            FROM information_schema.views
+            WHERE table_schema = COALESCE(@schema, DATABASE()) AND table_name = @view
+            """;
+
+        // A second connection: the column reader still owns the first.
+        await using var cn = new MySqlConnection(cs);
+        await cn.OpenAsync(ct);
+        await using var cmd = AdoHelpers.Command(cn, sql,
+            ("@schema", string.IsNullOrEmpty(table.Schema) ? null : table.Schema),
+            ("@view", table.Name));
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+
+        if (!await r.ReadAsync(ct))
+            return ViewMutability.Unknown;
+
+        return AdoHelpers.TruthyFlag(r, 0) ? ViewMutability.Updatable : ViewMutability.ReadOnly;
+    }
+
 
     internal static ClrTypeKind MapType(string dataType, string columnType)
     {

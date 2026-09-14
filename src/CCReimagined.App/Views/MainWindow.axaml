@@ -314,6 +314,13 @@
                                     <CheckBox Content="sealed class"
                                               IsChecked="{Binding SealedClass}" />
 
+                                    <CheckBox IsThreeState="True"
+                                              IsChecked="{Binding MutatingMethodsForViews}"
+                                              ToolTip.Tip="Indeterminate follows the database: a view it reports as read-only generates without Add, Update and Delete. Tick or untick to overrule it.">
+                                        <TextBlock Text="Add / Update / Delete for views (indeterminate = ask the database)"
+                                                   TextWrapping="Wrap" />
+                                    </CheckBox>
+
                                     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
                                         <TextBlock Classes="label" Text="Row cap on list getters" />
                                         <TextBox Text="{Binding ListMaxRows}" Width="80"

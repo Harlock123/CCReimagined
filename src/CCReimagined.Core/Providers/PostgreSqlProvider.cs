@@ -181,8 +181,40 @@ public sealed class PostgreSqlProvider : IDatabaseProvider
             Table = table,
             Columns = columns,
             KeyColumn = TableSchema.ResolveKeyColumn(columns, table.Name),
+            Mutability = table.Kind == RelationKind.View
+                ? await ViewMutabilityAsync(cs, schema, table.Name, ct)
+                : ViewMutability.NotApplicable,
         };
     }
+
+    /// <summary>
+    /// PostgreSQL answers this properly: a simple view is auto-updatable, and one with an
+    /// INSTEAD OF trigger is updatable through the trigger.
+    /// </summary>
+    private static async Task<ViewMutability> ViewMutabilityAsync(
+        string cs, string schema, string view, CancellationToken ct)
+    {
+        const string sql = """
+            SELECT is_updatable, is_trigger_updatable
+            FROM information_schema.views
+            WHERE table_schema = @schema AND table_name = @view
+            """;
+
+        // A second connection, because the column reader still owns the first one and these
+        // clients allow a single command in flight at a time.
+        await using var cn = new NpgsqlConnection(cs);
+        await cn.OpenAsync(ct);
+        await using var cmd = AdoHelpers.Command(cn, sql, ("@schema", schema), ("@view", view));
+        await using var r = await cmd.ExecuteReaderAsync(ct);
+
+        if (!await r.ReadAsync(ct))
+            return ViewMutability.Unknown;
+
+        return AdoHelpers.TruthyFlag(r, 0) || AdoHelpers.TruthyFlag(r, 1)
+            ? ViewMutability.Updatable
+            : ViewMutability.ReadOnly;
+    }
+
 
     internal static ClrTypeKind MapType(string dataType, string udtName)
     {

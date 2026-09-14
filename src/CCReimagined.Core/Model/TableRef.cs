@@ -29,6 +29,15 @@ public sealed record TableSchema
     public ColumnInfo? KeyColumn { get; init; }
 
     /// <summary>
+    /// For a view, whether the engine will accept writes through it. Always
+    /// <see cref="ViewMutability.NotApplicable"/> for a table.
+    /// </summary>
+    public ViewMutability Mutability { get; init; } = ViewMutability.NotApplicable;
+
+    /// <summary>True when this is a view the engine has confirmed cannot be written through.</summary>
+    public bool IsReadOnlyView => Table.Kind == RelationKind.View && Mutability == ViewMutability.ReadOnly;
+
+    /// <summary>
     /// True when <see cref="KeyColumn"/> is genuinely database-generated. When false the
     /// key was guessed, and the UI warns — the same caveat the old tool raised in a
     /// message box, only now it is not fatal to generation.

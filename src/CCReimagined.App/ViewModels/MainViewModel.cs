@@ -215,6 +215,13 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool SealedClass { get; set; } = true;
 
+    /// <summary>
+    /// Null follows the database, which is the default. The UI exposes it as a tri-state so a
+    /// view the engine misjudges can be overruled either way.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool? MutatingMethodsForViews { get; set; }
+
     [ObservableProperty]
     public partial string ListMaxRows { get; set; } = "0";
 
@@ -363,6 +370,7 @@ public partial class MainViewModel : ViewModelBase
                 GenerateReadAsDataTable = GenerateReadAsDataTable,
                 GenerateGetAll = GenerateGetAll,
                 SealedClass = SealedClass,
+                MutatingMethodsForViews = MutatingMethodsForViews,
                 ListMaxRows = int.TryParse(ListMaxRows, out var rows) && rows > 0 ? rows : 0,
             },
         };
@@ -695,11 +703,16 @@ public partial class MainViewModel : ViewModelBase
 
             var unmapped = schema.Columns.Count(c => c.ClrType == ClrTypeKind.Unknown);
 
+            var viewNote = schema.Table.Kind == RelationKind.View
+                ? $" — view, {schema.Mutability.Describe()}"
+                : "";
+
             SchemaSummary =
                 $"{schema.Columns.Count} column(s), " +
                 $"key: {schema.KeyColumn?.Name ?? "none found"}" +
                 (schema.HasGeneratedKey ? " (database-generated)" : " (not auto-numbered)") +
-                (unmapped > 0 ? $", {unmapped} unmapped type(s)" : "");
+                (unmapped > 0 ? $", {unmapped} unmapped type(s)" : "") +
+                viewNote;
 
             // The old tool popped a modal warning here and carried on regardless; saying it
             // once in the summary line is enough, and generation still works either way.
