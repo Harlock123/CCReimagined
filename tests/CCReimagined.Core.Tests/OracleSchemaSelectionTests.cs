@@ -2,6 +2,7 @@ using CCReimagined.App.ViewModels;
 using CCReimagined.Core.Model;
 using CCReimagined.Core.Profiles;
 using CCReimagined.Core.Providers;
+using Oracle.ManagedDataAccess.Client;
 
 namespace CCReimagined.Core.Tests;
 
@@ -25,6 +26,15 @@ public sealed class OracleSchemaSelectionTests : IDisposable
     {
         if (Directory.Exists(_configRoot))
             Directory.Delete(_configRoot, recursive: true);
+    }
+
+    private static async Task ExecuteAsync(string connectionString, string sql)
+    {
+        await using var cn = new OracleConnection(connectionString);
+        await cn.OpenAsync();
+        await using var cmd = cn.CreateCommand();
+        cmd.CommandText = sql;
+        await cmd.ExecuteNonQueryAsync();
     }
 
     [Fact]
@@ -67,6 +77,23 @@ public sealed class OracleSchemaSelectionTests : IDisposable
         var connectionString = await LiveServers.ReachableConnectionStringAsync(target);
         Skip.If(connectionString is null, LiveServers.SkipReason(target));
 
+        // A schema with no objects in it is not listed at all, and a freshly started server
+        // has none — so the test makes its own rather than assuming a seeded database.
+        var table = $"ccr_sel_{Guid.NewGuid():N}"[..20];
+        await ExecuteAsync(connectionString!, $"CREATE TABLE {table} (id NUMBER(9) PRIMARY KEY)");
+
+        try
+        {
+            await AssertSchemaSelectionAsync(target, connectionString!, table);
+        }
+        finally
+        {
+            await ExecuteAsync(connectionString!, $"DROP TABLE {table}");
+        }
+    }
+
+    private async Task AssertSchemaSelectionAsync(LiveTarget target, string connectionString, string table)
+    {
         var vm = new MainViewModel(TempStore())
         {
             SelectedProvider = ProviderRegistry.ById("oracle"),
@@ -83,7 +110,8 @@ public sealed class OracleSchemaSelectionTests : IDisposable
 
         Assert.True(vm.IsConnected, vm.StatusMessage);
         Assert.Contains("FREEPDB1", vm.EffectiveConnectionString);
-        Assert.NotEmpty(vm.Relations);
+        Assert.Contains(vm.Relations, r =>
+            string.Equals(r.Relation.Name, table, StringComparison.OrdinalIgnoreCase));
 
         // Nothing is auto-selected, because the connected service is not one of these entries.
         Assert.Null(vm.SelectedDatabase);
@@ -98,6 +126,8 @@ public sealed class OracleSchemaSelectionTests : IDisposable
         Assert.Contains("FREEPDB1", vm.EffectiveConnectionString);
         Assert.DoesNotContain("/CCR", vm.EffectiveConnectionString);
         Assert.All(vm.Relations, r => Assert.Equal("CCR", r.Relation.Schema));
+        Assert.Contains(vm.Relations, r =>
+            string.Equals(r.Relation.Name, table, StringComparison.OrdinalIgnoreCase));
 
         // And the connection still works afterwards.
         var probe = await ProviderRegistry.ById("oracle")
