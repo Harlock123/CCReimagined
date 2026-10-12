@@ -13,6 +13,21 @@ This first cut focuses on the database orchestration — connect, browse, read s
 data class. The original tool's other generators (XAML, WinForms, HTML/CSS, TypeScript, the LM
 Studio integration, the subnet scanner) are deliberately not carried over yet.
 
+## Download
+
+**[Get the latest release](../../releases/latest)**: the archive for your platform, then extract it and
+run `CCReimagined.App`. Each build is one self-contained file, so there is no .NET to install first.
+
+| Platform | Archive |
+| --- | --- |
+| Windows | `win-x64` or `win-arm64` (.zip) |
+| macOS | `osx-arm64` for Apple Silicon, `osx-x64` for Intel (.tar.gz) |
+| Linux | `linux-x64` or `linux-arm64` (.tar.gz) |
+
+The macOS builds are not signed or notarised, so clear the quarantine once before the first launch:
+`xattr -d com.apple.quarantine CCReimagined.App` (or allow it under System Settings → Privacy &
+Security). On Linux, `chmod +x CCReimagined.App` if your extractor dropped the executable bit.
+
 ## Engines
 
 | Engine | Browsing | Generated code uses |
